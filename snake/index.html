@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Snake — eat, grow, don't bite yourself</title>
+<meta name="description" content="A smooth neon take on the classic snake game. Arrow keys, WASD or swipe.">
+<style>
+  :root{--bg:#070b14;--ink:#e8eef9;--dim:#6d7c95;--acc:#22d3ee}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    display:flex;align-items:center;justify-content:center}
+  #stage{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px}
+  #hud{display:flex;gap:26px;font-size:13px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+  #hud b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:16px;margin-left:6px}
+  canvas{border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.06)}
+  #over{position:absolute;inset:0;display:none;place-items:center;border-radius:18px;
+    background:rgba(7,11,20,.82);backdrop-filter:blur(6px);text-align:center}
+  #over.show{display:grid}
+  #over h2{margin:0 0 6px;font-size:26px}
+  #over p{margin:0 0 18px;color:var(--dim);font-size:14px}
+  #over button{font:inherit;font-weight:600;color:#04202a;background:var(--acc);border:0;
+    border-radius:999px;padding:12px 26px;cursor:pointer}
+  #hint{font-size:12px;color:#4f5d75}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="hud"><span>score<b id="score">0</b></span><span>best<b id="best">0</b></span></div>
+  <canvas id="c"></canvas>
+  <div id="hint">arrows / WASD / swipe</div>
+  <div id="over"><div><h2 id="overTitle">Game over</h2><p id="overSub"></p><button id="again">Play again</button></div></div>
+</div>
+<script>
+(() => {
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const scoreEl = document.getElementById('score'), bestEl = document.getElementById('best');
+  const over = document.getElementById('over'), overTitle = document.getElementById('overTitle'), overSub = document.getElementById('overSub');
+  const hint = document.getElementById('hint');
+
+  const CELL = 26;
+  let N = 20, size = 0, dpr = Math.min(devicePixelRatio || 1, 2);
+
+  let snake, dir, queue, food, score, alive, acc, stepMs, best = +(localStorage.getItem('snake.best') || 0);
+  bestEl.textContent = best;
+
+  function fit() {
+    const pad = 24;
+    const s = Math.min(innerWidth - pad * 2, innerHeight - 140);
+    size = Math.floor(s / CELL) * CELL;
+    N = size / CELL;
+    cv.width = size * dpr; cv.height = size * dpr;
+    cv.style.width = size + 'px'; cv.style.height = size + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function reset() {
+    snake = [{ x: 8, y: 10 }, { x: 7, y: 10 }, { x: 6, y: 10 }];
+    dir = { x: 1, y: 0 }; queue = [];
+    score = 0; alive = true; acc = 0; stepMs = 150;
+    scoreEl.textContent = 0;
+    over.classList.remove('show');
+    placeFood();
+  }
+
+  function placeFood() {
+    const free = [];
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (!snake.some(s => s.x === x && s.y === y)) free.push({ x, y });
+    }
+    food = free[Math.floor(Math.random() * free.length)] || { x: 0, y: 0 };
+    food.t = performance.now();
+  }
+
+  function turn(nx, ny) {
+    const last = queue.length ? queue[queue.length - 1] : dir;
+    if (last.x === -nx && last.y === -ny) return;   // no 180°
+    if (last.x === nx && last.y === ny) return;     // same
+    if (queue.length < 2) queue.push({ x: nx, y: ny });
+  }
+
+  function step() {
+    if (queue.length) dir = queue.shift();
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    if (head.x < 0 || head.y < 0 || head.x >= N || head.y >= N) return die();
+    // self collision (tail tip is about to move, so it's allowed)
+    for (let i = 0; i < snake.length - 1; i++) {
+      if (snake[i].x === head.x && snake[i].y === head.y) return die();
+    }
+
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+      score += 10;
+      scoreEl.textContent = score;
+      if (score > best) { best = score; bestEl.textContent = best; localStorage.setItem('snake.best', best); }
+      stepMs = Math.max(72, stepMs - 2.5);
+      placeFood();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function die() {
+    alive = false;
+    overTitle.textContent = 'Game over';
+    overSub.textContent = 'score ' + score + (score >= best && score > 0 ? ' — new best' : '');
+    over.classList.add('show');
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function draw(now) {
+    ctx.clearRect(0, 0, size, size);
+    // board
+    const g = ctx.createLinearGradient(0, 0, size, size);
+    g.addColorStop(0, '#0c1426'); g.addColorStop(1, '#0a1020');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, size, size);
+
+    // grid dots
+    ctx.fillStyle = 'rgba(255,255,255,0.045)';
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      ctx.fillRect(x * CELL + CELL / 2 - 1, y * CELL + CELL / 2 - 1, 2, 2);
+    }
+
+    // food
+    const pulse = 1 + Math.sin((now - (food.t || 0)) / 240) * 0.12;
+    ctx.save();
+    ctx.translate(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2);
+    ctx.scale(pulse, pulse);
+    ctx.beginPath(); ctx.arc(0, 0, CELL * 0.30, 0, Math.PI * 2);
+    ctx.fillStyle = '#fb7185'; ctx.shadowColor = 'rgba(251,113,133,.75)'; ctx.shadowBlur = 22; ctx.fill();
+    ctx.restore();
+
+    // snake
+    for (let i = snake.length - 1; i >= 0; i--) {
+      const s = snake[i], t = i / Math.max(1, snake.length - 1);
+      const pad = 2 + t * 2.2;
+      const x = s.x * CELL + pad, y = s.y * CELL + pad, w = CELL - pad * 2;
+      const hue = 190 + t * 60;
+      roundRect(x, y, w, w, Math.max(4, w * 0.32));
+      if (i === 0) {
+        ctx.fillStyle = '#67e8f9';
+        ctx.shadowColor = 'rgba(34,211,238,.8)'; ctx.shadowBlur = 26;
+      } else {
+        ctx.fillStyle = `hsla(${hue}, 80%, ${58 - t * 18}%, ${1 - t * 0.45})`;
+        ctx.shadowColor = 'rgba(34,211,238,.35)'; ctx.shadowBlur = 12;
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // eyes on head
+    const h = snake[0];
+    const cx = h.x * CELL + CELL / 2, cy = h.y * CELL + CELL / 2;
+    const ox = dir.x * 4.5, oy = dir.y * 4.5;
+    const px = dir.x === 0 ? 5 : 0, py = dir.y === 0 ? 5 : 0;
+    ctx.fillStyle = '#04202a';
+    ctx.beginPath(); ctx.arc(cx + ox + px, cy + oy + py, 2.1, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + ox - px, cy + oy - py, 2.1, 0, 7); ctx.fill();
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(80, now - last); last = now;
+    if (alive) {
+      acc += dt;
+      while (acc >= stepMs) { acc -= stepMs; if (alive) step(); }
+    }
+    draw(now);
+    requestAnimationFrame(loop);
+  }
+
+  // ---- input ----
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (['arrowup', 'w'].includes(k)) { turn(0, -1); e.preventDefault(); }
+    else if (['arrowdown', 's'].includes(k)) { turn(0, 1); e.preventDefault(); }
+    else if (['arrowleft', 'a'].includes(k)) { turn(-1, 0); e.preventDefault(); }
+    else if (['arrowright', 'd'].includes(k)) { turn(1, 0); e.preventDefault(); }
+    else if (k === ' ' || k === 'enter') { if (!alive) { reset(); } e.preventDefault(); }
+    hint.style.opacity = 0.35;
+  }, { passive: false });
+
+  let tx = 0, ty = 0;
+  cv.addEventListener('touchstart', e => { const t = e.touches[0]; tx = t.clientX; ty = t.clientY; }, { passive: true });
+  cv.addEventListener('touchend', e => {
+    const t = e.changedTouches[0];
+    const dx = t.clientX - tx, dy = t.clientY - ty;
+    if (Math.hypot(dx, dy) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? 1 : -1, 0);
+    else turn(0, dy > 0 ? 1 : -1);
+    hint.style.opacity = 0.35;
+  }, { passive: true });
+
+  document.getElementById('again').addEventListener('click', reset);
+
+  addEventListener('resize', () => { dpr = Math.min(devicePixelRatio || 1, 2); fit(); });
+  fit(); reset(); requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
