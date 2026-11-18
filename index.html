@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Decompress — three little toys for your hands</title>
-<meta name="description" content="Three tiny browser toys: bubble wrap, silk ribbons and pouring sand. No install, no accounts, no ads.">
+<title>Yao Arcade — nine browser games</title>
+<meta name="description" content="Nine browser games: arcade, puzzles, racing, roguelite and management. No install or accounts.">
 <style>
   :root{--bg:#070b14;--ink:#e8eef9;--dim:#6d7c95;--line:rgba(255,255,255,.08)}
   *{box-sizing:border-box}
@@ -33,6 +33,11 @@
      radial-gradient(circle at 64% 40%, rgba(34,211,238,.35) 8px, transparent 9px),
      radial-gradient(circle at 80% 30%, rgba(251,113,133,.9) 7px, transparent 8px),
      linear-gradient(135deg,#0b1322,#12203a)}
+  .thumb.breakout{background:repeating-linear-gradient(90deg,transparent 0 27px,#0d1023 27px 31px),repeating-linear-gradient(0deg,#9d4edd 0 12px,#47237d 12px 16px,#efb86a 16px 28px,#17142b 28px 32px)}
+  .thumb.nightdrive{background:linear-gradient(165deg,transparent 48%,#16d9f6 49% 50%,transparent 51%),linear-gradient(195deg,transparent 48%,#f043a2 49% 50%,transparent 51%),linear-gradient(180deg,#160d38 0%,#36204d 55%,#101629 56%)}
+  .thumb.embervault{background:radial-gradient(circle at 50% 63%,#ff9c43 0 7px,#d75122 8px 15px,transparent 37px),repeating-linear-gradient(90deg,#1b1b21 0 29px,#292932 30px 31px)}
+  .thumb.foundry{background:linear-gradient(145deg,transparent 45%,rgba(234,170,91,.45) 46% 50%,transparent 51%),repeating-linear-gradient(90deg,#1b272b 0 28px,#384951 29px 30px)}
+  .thumb.prismshift{background:linear-gradient(130deg,transparent 45%,rgba(100,241,255,.8) 46% 47%,transparent 48%),radial-gradient(circle at 68% 39%,#eab6f9 0 8px,transparent 13px),#101632}
   h2{margin:0 0 6px;font-size:17px}
   .desc{color:var(--dim);font-size:13px;line-height:1.55;margin:0}
   footer{margin-top:44px;color:#4b5871;font-size:12px;text-align:center;line-height:1.8}
@@ -40,8 +45,8 @@
 </style>
 </head>
 <body>
-  <h1>Decompress</h1>
-  <p class="sub">Three tiny toys for your hands. No goals, no timers, no ads. Open one, poke at it for a minute, close the tab.</p>
+  <h1>Yao Arcade</h1>
+  <p class="sub">Nine games, from tactile toys to longer arcade adventures. No install, no account. Pick a world and play.</p>
   <div class="grid">
     <a class="card" href="./bubblewrap/">
       <div class="thumb bw"></div>
@@ -63,10 +68,15 @@
       <h2>Snake</h2>
       <p class="desc">The classic, rebuilt smooth: neon body, pulsing food, speed that creeps up on you.</p>
     </a>
+    <a class="card" href="./breakout/"><div class="thumb breakout"></div><h2>Prism Break</h2><p class="desc">Eight brick walls, five power-ups, and a paddle that rewards precision.</p></a>
+    <a class="card" href="./nightdrive/"><div class="thumb nightdrive"></div><h2>Nightdrive</h2><p class="desc">Three neon highways. Dodge traffic and race the clock.</p></a>
+    <a class="card" href="./embervault/"><div class="thumb embervault"></div><h2>Embervault</h2><p class="desc">A five-floor turn-based roguelite. Choose boons, survive monsters, slay the heart.</p></a>
+    <a class="card" href="./foundry/"><div class="thumb foundry"></div><h2>Valve Foundry</h2><p class="desc">Build a fictional factory, balance bottlenecks and deliver contracts on time.</p></a>
+    <a class="card" href="./prismshift/"><div class="thumb prismshift"></div><h2>Prism Shift</h2><p class="desc">Route coloured light through 14 handcrafted optical puzzles.</p></a>
   </div>
   <footer>
     Made by Yao Engineering · <a href="https://ko-fi.com/yaoengineering" target="_blank" rel="noopener">engineering calculation tools</a><br>
-    All three games are single HTML files, MIT licensed.
+    The original three tactile toys are MIT licensed. All games run as single HTML files.
   </footer>
 </body>
 </html>

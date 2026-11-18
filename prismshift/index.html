@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<title>Prism Shift — route the light, light every crystal</title>
+<meta name="theme-color" content="#05080f">
+<meta name="description" content="A free browser puzzle: rotate mirrors and prisms to bend coloured light into every crystal. 14 handcrafted levels, mouse or touch.">
+<style>
+  :root{
+    --bg:#05080f; --ink:#e9f1ff; --dim:#8494ad; --line:rgba(255,255,255,.08);
+    --acc:#59e0ff; --acc2:#a78bfa; --amber:#fbbf24; --cyan:#22d3ee;
+    --panel:rgba(255,255,255,.035);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  body{background:
+      radial-gradient(1100px 700px at 50% -18%, rgba(34,211,238,.10), transparent 62%),
+      radial-gradient(800px 600px at 88% 108%, rgba(167,139,250,.10), transparent 60%),
+      var(--bg);}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;
+    padding:max(10px,env(safe-area-inset-top)) 12px max(10px,env(safe-area-inset-bottom));
+    max-width:900px;margin:0 auto;gap:8px}
+
+  header{display:flex;align-items:center;gap:10px;flex:0 0 auto}
+  .icon{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);
+    background:var(--panel);display:grid;place-items:center;font-size:15px;color:var(--dim);
+    transition:.18s}
+  .icon:hover{color:var(--ink);border-color:rgba(255,255,255,.22)}
+  #lvTitle{flex:1;min-width:0;text-align:center}
+  #lvName{font-size:15px;font-weight:650;letter-spacing:.01em;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  #lvSub{font-size:11px;color:var(--dim);letter-spacing:.09em;text-transform:uppercase;margin-top:2px}
+  .chips{display:flex;gap:7px}
+  .chip{border:1px solid var(--line);background:var(--panel);border-radius:10px;
+    padding:5px 10px;text-align:center;min-width:52px}
+  .chip span{display:block;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .chip b{font-size:15px;font-variant-numeric:tabular-nums;font-weight:650}
+  .chip.hot b{color:var(--acc)}
+
+  #tipBar{flex:0 0 auto;text-align:center;font-size:12.5px;color:var(--dim);line-height:1.45;
+    min-height:34px;display:flex;align-items:center;justify-content:center;padding:0 6px;
+    transition:color .3s}
+  #tipBar.flash{color:var(--acc)}
+
+  #stage{flex:1 1 auto;position:relative;min-height:0;display:flex}
+  canvas{width:100%;height:100%;display:block;touch-action:none;border-radius:18px}
+
+  footer{flex:0 0 auto;display:flex;gap:8px;justify-content:center}
+  .tool{flex:1 1 0;max-width:130px;height:44px;border-radius:13px;border:1px solid var(--line);
+    background:var(--panel);display:flex;align-items:center;justify-content:center;gap:7px;
+    font-size:12.5px;color:var(--dim);transition:.16s;letter-spacing:.02em}
+  .tool:hover{color:var(--ink);border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.06)}
+  .tool:active{transform:scale(.97)}
+  .tool.dim{opacity:.35;pointer-events:none}
+  .tool.on{color:var(--acc);border-color:rgba(89,224,255,.35)}
+  .ic{width:17px;height:17px;flex:0 0 auto}
+  .tool .mute{opacity:0;transition:opacity .2s}
+  .tool .waves{opacity:1;transition:opacity .2s}
+  .tool.off .mute{opacity:1}
+  .tool.off .waves{opacity:0}
+  .tool.off{color:var(--dim)}
+
+  /* ---------------- overlays ---------------- */
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    padding:16px;background:rgba(4,7,13,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    opacity:0;pointer-events:none;transition:opacity .28s;z-index:20}
+  .overlay.show{opacity:1;pointer-events:auto}
+  .sheet{width:100%;max-width:560px;max-height:100%;overflow:auto;border-radius:22px;
+    border:1px solid rgba(255,255,255,.09);
+    background:linear-gradient(180deg,rgba(22,31,48,.94),rgba(11,16,26,.96));
+    padding:24px 22px 20px;box-shadow:0 30px 90px rgba(0,0,0,.6);
+    transform:translateY(10px) scale(.985);transition:transform .3s}
+  .overlay.show .sheet{transform:none}
+  .sheet h1{margin:0;font-size:30px;letter-spacing:.16em;font-weight:300;text-align:center}
+  .sheet h1 b{font-weight:800;letter-spacing:.16em;margin-left:.14em;
+    background:linear-gradient(96deg,#59e0ff,#a78bfa 55%,#f472b6);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{text-align:center;color:var(--dim);font-size:13px;margin:8px 0 18px;line-height:1.5}
+
+  .how{display:grid;gap:7px;margin-bottom:18px}
+  .how div{font-size:12.5px;color:#9fb0c9;line-height:1.5;background:rgba(255,255,255,.03);
+    border:1px solid var(--line);border-radius:11px;padding:8px 11px}
+  .how b{color:var(--ink);font-weight:600}
+  .how .kb{color:#6f819c;font-size:11.5px}
+
+  .lvgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px}
+  .lvl{position:relative;aspect-ratio:1;border-radius:13px;border:1px solid var(--line);
+    background:rgba(255,255,255,.03);display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:3px;transition:.16s;font-variant-numeric:tabular-nums}
+  .lvl .n{font-size:15px;font-weight:650}
+  .lvl .nm{font-size:8px;color:var(--dim);letter-spacing:.02em;max-width:100%;overflow:hidden;
+    white-space:nowrap;text-overflow:ellipsis;padding:0 3px}
+  .lvl .st{font-size:8px;letter-spacing:1.5px;color:#3d4c66;height:9px}
+  .lvl.done{border-color:rgba(89,224,255,.3);background:rgba(89,224,255,.07)}
+  .lvl.done .st{color:var(--amber);text-shadow:0 0 8px rgba(251,191,36,.45)}
+  .lvl.next{border-color:rgba(89,224,255,.55);box-shadow:0 0 0 1px rgba(89,224,255,.18),0 0 22px rgba(89,224,255,.16)}
+  .lvl:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.24)}
+  .lvl.locked{opacity:.4;cursor:not-allowed}
+  .lvl.locked .n{color:#5c6b85;display:flex;align-items:center;justify-content:center;height:15px}
+  .lvl.locked .n svg{display:block}
+
+  .menuFoot{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:var(--dim)}
+  .link{font-size:11.5px;color:var(--dim);text-decoration:underline;text-underline-offset:3px}
+  .link:hover{color:#ff8095}
+
+  /* win sheet */
+  #win .sheet{text-align:center;padding:30px 26px 24px}
+  #win h2{margin:2px 0 6px;font-size:27px;letter-spacing:.01em;font-weight:700}
+  #win .stars{font-size:42px;letter-spacing:14px;margin:14px 0 8px;color:#2a3450;height:52px;
+    text-indent:14px}
+  #win .st{display:inline-block;opacity:.18;transform:scale(.7);transition:.3s}
+  #win .st.on{opacity:1;transform:none;color:var(--amber);
+    text-shadow:0 0 22px rgba(251,191,36,.6)}
+  #winTxt{color:var(--dim);font-size:14px;line-height:1.7;margin:4px 0 22px}
+  #winTxt b{color:var(--ink)}
+  .row{display:flex;gap:9px}
+  .btn{flex:1;height:46px;border-radius:13px;border:1px solid var(--line);
+    background:rgba(255,255,255,.05);font-size:13.5px;font-weight:600;transition:.16s;
+    display:flex;align-items:center;justify-content:center;gap:6px}
+  .btn:hover{background:rgba(255,255,255,.1)}
+  .btn.primary{background:linear-gradient(96deg,#39c9f0,#7c6df5);border:0;color:#04121a;
+    box-shadow:0 8px 26px rgba(60,180,240,.28)}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn:active{transform:scale(.98)}
+
+  @media (max-width:420px){
+    .lvgrid{grid-template-columns:repeat(4,1fr)}
+    .sheet h1{font-size:25px}
+    .tool span{display:none}
+    .tool{height:46px}
+    .tool .ic{width:20px;height:20px}
+  }
+  @media (max-height:560px){
+    #tipBar{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button id="menuBtn" class="icon" aria-label="Level select">☰</button>
+    <div id="lvTitle">
+      <div id="lvName">First Light</div>
+      <div id="lvSub">Level 1 of 14</div>
+    </div>
+    <div class="chips">
+      <div class="chip"><span>Moves</span><b id="movesEl">0</b></div>
+      <div class="chip"><span>Par</span><b id="parEl">0</b></div>
+    </div>
+  </header>
+  <div id="tipBar"><span id="tipText"></span></div>
+  <main id="stage"><canvas id="cv" aria-label="Prism Shift puzzle board"></canvas></main>
+  <footer>
+    <button id="undoBtn" class="tool" title="Undo (U)">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 14.5 4.5 9.5l5-5"/><path d="M4.5 9.5H14a5.5 5.5 0 0 1 0 11h-3.2"/></svg>
+      <span>Undo</span></button>
+    <button id="hintBtn" class="tool" title="Hint (H)">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.2 13.9 9l5.8 1.9-5.8 1.9L12 18.6l-1.9-5.8L4.3 10.9 10.1 9z"/></svg>
+      <span>Hint</span></button>
+    <button id="resetBtn" class="tool" title="Reset level (R)">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4.2V9.6h-5.3"/></svg>
+      <span>Reset</span></button>
+    <button id="soundBtn" class="tool" title="Sound">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.4h3.4L12 5.8v12.4L7.4 14.6H4z"/><g class="waves"><path d="M15.4 9.4a3.8 3.8 0 0 1 0 5.2"/><path d="M18 7a7.2 7.2 0 0 1 0 10"/></g><g class="mute"><path d="M15.6 9.6l4.8 4.8"/><path d="M20.4 9.6l-4.8 4.8"/></g></svg>
+      <span>Sound</span></button>
+  </footer>
+</div>
+
+<div id="menu" class="overlay show">
+  <div class="sheet">
+    <h1>PRISM<b>SHIFT</b></h1>
+    <p class="tag">Turn the mirrors. Split the light. Light every crystal.</p>
+    <div class="how">
+      <div><b>Tap</b> a mirror or prism to turn it a quarter turn.</div>
+      <div><b>Filters</b> dye the beam — a crystal only lights for its own colour.</div>
+      <div><b>Prisms</b> split one beam into two. <b>Portals</b> carry light across the board.</div>
+      <div class="kb">Keyboard: <b>arrows</b> to aim · <b>space</b> to turn · <b>U</b> undo · <b>H</b> hint · <b>R</b> reset</div>
+    </div>
+    <div id="levelGrid" class="lvgrid"></div>
+    <div class="menuFoot">
+      <span id="starTotal">0 / 42 stars</span>
+      <button id="wipeBtn" class="link">Reset progress</button>
+    </div>
+  </div>
+</div>
+
+<div id="win" class="overlay">
+  <div class="sheet">
+    <h2 id="winTitle">Solved</h2>
+    <div class="stars"><span class="st">★</span><span class="st">★</span><span class="st">★</span></div>
+    <p id="winTxt">…</p>
+    <div class="row">
+      <button id="winReplay" class="btn">Replay</button>
+      <button id="winNext" class="btn primary">Next level</button>
+    </div>
+  </div>
+</div>
+
+<script id="levels" type="application/json">[{"id":1,"name":"First Light","w":5,"h":5,"tip":"Tap a mirror to turn it. Get the beam into the crystal.","tiles":[{"t":"emitter","x":0,"y":1,"d":0,"c":"white"},{"t":"mirror","x":3,"y":1,"r":0,"id":"m1"},{"t":"crystal","x":3,"y":3,"c":"white","id":"c1"}]},{"id":2,"name":"Two Turns","w":5,"h":5,"tip":"Every mirror bends the light 90 degrees. Some trips need two bends.","tiles":[{"t":"emitter","x":0,"y":0,"d":0,"c":"white"},{"t":"mirror","x":4,"y":0,"r":0,"id":"m1"},{"t":"mirror","x":4,"y":4,"r":1,"id":"m2"},{"t":"crystal","x":0,"y":4,"c":"white","id":"c1"}]},{"id":3,"name":"Pillar","w":6,"h":6,"tip":"Stone swallows light. Go around it.","tiles":[{"t":"emitter","x":0,"y":2,"d":0,"c":"white"},{"t":"wall","x":3,"y":2},{"t":"wall","x":3,"y":3},{"t":"wall","x":3,"y":4},{"t":"mirror","x":1,"y":2,"r":0,"id":"m1"},{"t":"mirror","x":1,"y":5,"r":0,"id":"m2"},{"t":"crystal","x":5,"y":5,"c":"white","id":"c1"}]},{"id":4,"name":"Dye Job","w":6,"h":6,"tip":"A crystal only lights for its own colour. A filter dyes the beam as it passes.","tiles":[{"t":"emitter","x":0,"y":0,"d":0,"c":"white"},{"t":"mirror","x":5,"y":0,"r":0,"id":"m1"},{"t":"mirror","x":5,"y":4,"r":1,"id":"m2"},{"t":"filter","x":2,"y":4,"c":"cyan"},{"t":"crystal","x":1,"y":4,"c":"cyan","id":"c1"}]},{"id":5,"name":"Split Decision","w":6,"h":6,"tip":"A prism splits the beam: one ray straight on, one out to the side.","tiles":[{"t":"emitter","x":0,"y":3,"d":0,"c":"white"},{"t":"prism","x":3,"y":3,"r":1,"id":"p1"},{"t":"mirror","x":3,"y":0,"r":0,"id":"m1"},{"t":"crystal","x":5,"y":3,"c":"white","id":"c1"},{"t":"crystal","x":0,"y":0,"c":"white","id":"c2"}]},{"id":6,"name":"Wrong Hue","w":6,"h":6,"tip":"Two crystals, two colours. The split ray needs its own dye.","tiles":[{"t":"emitter","x":0,"y":2,"d":0,"c":"white"},{"t":"prism","x":2,"y":2,"r":1,"id":"p1"},{"t":"mirror","x":2,"y":0,"r":1,"id":"m1"},{"t":"filter","x":4,"y":2,"c":"cyan"},{"t":"crystal","x":5,"y":2,"c":"cyan","id":"c1"},{"t":"filter","x":4,"y":0,"c":"amber"},{"t":"crystal","x":5,"y":0,"c":"amber","id":"c2"}]},{"id":7,"name":"Prism Break","w":7,"h":7,"tip":"One beam, three crystals. Prisms can feed each other.","tiles":[{"t":"emitter","x":0,"y":3,"d":0,"c":"white"},{"t":"prism","x":2,"y":3,"r":1,"id":"p1"},{"t":"prism","x":4,"y":3,"r":0,"id":"p2"},{"t":"mirror","x":2,"y":0,"r":1,"id":"m1"},{"t":"crystal","x":6,"y":3,"c":"white","id":"c1"},{"t":"crystal","x":5,"y":0,"c":"white","id":"c2"},{"t":"crystal","x":4,"y":6,"c":"white","id":"c3"}]},{"id":8,"name":"Loop Back","w":7,"h":7,"tip":"Portals throw light across the board. It keeps its direction.","tiles":[{"t":"emitter","x":0,"y":1,"d":0,"c":"white"},{"t":"mirror","x":3,"y":1,"r":0,"id":"m1"},{"t":"portal","x":3,"y":3,"pair":1,"id":"p1"},{"t":"portal","x":5,"y":5,"pair":1,"id":"p2"},{"t":"mirror","x":5,"y":6,"r":1,"id":"m2"},{"t":"crystal","x":1,"y":6,"c":"white","id":"c1"}]},{"id":9,"name":"Crossfire","w":7,"h":7,"tip":"Two emitters, one board. Both crystals have to burn.","tiles":[{"t":"emitter","x":0,"y":0,"d":0,"c":"white"},{"t":"emitter","x":0,"y":6,"d":0,"c":"white"},{"t":"mirror","x":5,"y":0,"r":0,"id":"m1"},{"t":"mirror","x":2,"y":6,"r":1,"id":"m2"},{"t":"filter","x":5,"y":3,"c":"cyan"},{"t":"crystal","x":5,"y":5,"c":"cyan","id":"c1"},{"t":"filter","x":2,"y":4,"c":"amber"},{"t":"crystal","x":2,"y":2,"c":"amber","id":"c2"}]},{"id":10,"name":"Glasswork","w":7,"h":7,"tip":"Split first, dye after. Everything on this board is one beam.","tiles":[{"t":"emitter","x":0,"y":3,"d":0,"c":"white"},{"t":"prism","x":2,"y":3,"r":1,"id":"p1"},{"t":"mirror","x":2,"y":0,"r":1,"id":"m1"},{"t":"prism","x":4,"y":3,"r":0,"id":"p2"},{"t":"filter","x":4,"y":0,"c":"cyan"},{"t":"crystal","x":6,"y":0,"c":"cyan","id":"c1"},{"t":"crystal","x":4,"y":6,"c":"white","id":"c2"},{"t":"crystal","x":6,"y":3,"c":"white","id":"c3"}]},{"id":11,"name":"Refraction","w":7,"h":7,"tip":"A portal in the middle of a split beam. Follow both rays.","tiles":[{"t":"emitter","x":0,"y":2,"d":0,"c":"white"},{"t":"prism","x":1,"y":2,"r":1,"id":"p1"},{"t":"mirror","x":1,"y":0,"r":1,"id":"m1"},{"t":"mirror","x":6,"y":4,"r":1,"id":"m2"},{"t":"portal","x":2,"y":2,"pair":2,"id":"p1"},{"t":"portal","x":5,"y":4,"pair":2,"id":"p2"},{"t":"mirror","x":3,"y":0,"r":0,"id":"m3"},{"t":"filter","x":6,"y":3,"c":"cyan"},{"t":"crystal","x":6,"y":1,"c":"cyan","id":"c1"},{"t":"crystal","x":3,"y":3,"c":"white","id":"c2"}]},{"id":12,"name":"Cold Storage","w":7,"h":7,"tip":"Three crystals, one emitter, two prisms. Every ray has to land.","tiles":[{"t":"emitter","x":0,"y":3,"d":0,"c":"white"},{"t":"prism","x":1,"y":3,"r":1,"id":"p1"},{"t":"mirror","x":1,"y":0,"r":1,"id":"m1"},{"t":"prism","x":3,"y":3,"r":0,"id":"p2"},{"t":"mirror","x":3,"y":6,"r":1,"id":"m2"},{"t":"filter","x":4,"y":0,"c":"amber"},{"t":"filter","x":5,"y":3,"c":"cyan"},{"t":"crystal","x":6,"y":0,"c":"amber","id":"c1"},{"t":"crystal","x":6,"y":3,"c":"cyan","id":"c2"},{"t":"crystal","x":2,"y":6,"c":"white","id":"c3"}]},{"id":13,"name":"Full Spectrum","w":8,"h":7,"tip":"Two emitters, two prisms, four crystals. Nothing here is spare.","tiles":[{"t":"emitter","x":0,"y":1,"d":0,"c":"white"},{"t":"emitter","x":0,"y":5,"d":0,"c":"white"},{"t":"prism","x":3,"y":1,"r":0,"id":"p1"},{"t":"prism","x":1,"y":5,"r":1,"id":"p2"},{"t":"mirror","x":6,"y":1,"r":0,"id":"m1"},{"t":"mirror","x":5,"y":5,"r":1,"id":"m2"},{"t":"filter","x":6,"y":4,"c":"amber"},{"t":"crystal","x":6,"y":6,"c":"amber","id":"c1"},{"t":"filter","x":5,"y":4,"c":"cyan"},{"t":"crystal","x":5,"y":2,"c":"cyan","id":"c2"},{"t":"crystal","x":3,"y":4,"c":"white","id":"c3"},{"t":"crystal","x":1,"y":2,"c":"white","id":"c4"}]},{"id":14,"name":"Afterglow","w":8,"h":8,"tip":"The last board. No new pieces, just everything at once.","tiles":[{"t":"emitter","x":0,"y":1,"d":0,"c":"white"},{"t":"emitter","x":0,"y":6,"d":0,"c":"white"},{"t":"prism","x":2,"y":1,"r":1,"id":"p1"},{"t":"prism","x":4,"y":1,"r":0,"id":"p2"},{"t":"prism","x":2,"y":6,"r":1,"id":"p3"},{"t":"mirror","x":2,"y":0,"r":0,"id":"m1"},{"t":"mirror","x":6,"y":1,"r":0,"id":"m2"},{"t":"mirror","x":4,"y":4,"r":0,"id":"m3"},{"t":"mirror","x":2,"y":3,"r":1,"id":"m4"},{"t":"mirror","x":4,"y":6,"r":1,"id":"m5"},{"t":"filter","x":6,"y":3,"c":"amber"},{"t":"filter","x":3,"y":6,"c":"cyan"},{"t":"crystal","x":0,"y":0,"c":"white","id":"c1"},{"t":"crystal","x":6,"y":6,"c":"amber","id":"c2"},{"t":"crystal","x":7,"y":4,"c":"white","id":"c3"},{"t":"crystal","x":3,"y":3,"c":"white","id":"c4"},{"t":"crystal","x":4,"y":5,"c":"cyan","id":"c5"}]}]</script>
+<script>
+"use strict";
+const LEVELS = JSON.parse(document.getElementById('levels').textContent);
+const DIRS = [[1,0],[0,1],[-1,0],[0,-1]];
+const COLOR = {white:'#eaf4ff', cyan:'#22d3ee', amber:'#fbbf24'};
+const SAVE_KEY = 'prismshift.v1';
+const TOTAL_STARS = LEVELS.length * 3;
+
+/* ---------------------------------------------------------------- save */
+const save = {
+  best: {},          // levelIndex -> {moves, stars}
+  unlocked: 1,       // highest level number available (1-based count)
+  sound: true,
+  seen: false
+};
+function loadSave(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(raw){ const o = JSON.parse(raw);
+      if(o && typeof o === 'object'){
+        save.best = o.best || {};
+        save.unlocked = Math.max(1, Math.min(LEVELS.length, o.unlocked || 1));
+        save.sound = o.sound !== false;
+        save.seen = !!o.seen;
+      }
+    }
+  }catch(e){}
+}
+function persist(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }catch(e){}
+}
+
+/* ---------------------------------------------------------------- audio */
+let AC = null;
+function audio(){
+  if(!AC){
+    const C = window.AudioContext || window.webkitAudioContext;
+    if(!C) return null;
+    AC = new C();
+  }
+  if(AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, gain, slideTo, delay){
+  if(!save.sound) return;
+  const c = audio(); if(!c) return;
+  const t0 = c.currentTime + (delay || 0);
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(gain || 0.07, t0 + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t0); o.stop(t0 + dur + 0.03);
+}
+const sfx = {
+  turn(){ tone(300, .07, 'triangle', .05, 180); },
+  lit(n){ tone(660 + n * 110, .22, 'sine', .06, 990); },
+  hint(){ tone(880, .1, 'sine', .04, 1200); },
+  undo(){ tone(220, .08, 'triangle', .04, 160); },
+  win(){ [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) =>
+          tone(f, .5, 'sine', .06, f * 1.002, i * .085)); }
+};
+
+/* ---------------------------------------------------------------- level utils */
+function prepLevel(lv){
+  const grid = new Map();
+  lv.tiles.forEach(t => grid.set(t.x + ',' + t.y, t));
+  lv.grid = grid;
+  lv.rotIds = lv.tiles.filter(t => t.t === 'mirror' || t.t === 'prism').map(t => t.id);
+  lv.crystals = lv.tiles.filter(t => t.t === 'crystal');
+  const pairs = {};
+  lv.tiles.forEach(t => {
+    if(t.t === 'portal'){
+      (pairs[t.pair] = pairs[t.pair] || []).push(t);
+    }
+  });
+  lv.pairs = pairs;
+  return lv;
+}
+LEVELS.forEach(prepLevel);
+
+function partnerOf(lv, t){
+  const arr = lv.pairs[t.pair];
+  if(!arr || arr.length < 2) return null;
+  return arr[0] === t ? arr[1] : arr[0];
+}
+
+/* Beam tracer. rots: {tileId: 0..3}. Mirrors: even = "/", odd = "\".
+   Prisms pass the ray straight and emit one perpendicular ray
+   (even -> left turn on screen, odd -> right turn). */
+function traceLevel(lv, rots){
+  const W = lv.w, H = lv.h, grid = lv.grid;
+  const segs = [], lit = new Set(), seen = new Set(), beams = [];
+  for(const t of lv.tiles){
+    if(t.t === 'emitter'){
+      const d = DIRS[t.d];
+      beams.push({x:t.x, y:t.y, dx:d[0], dy:d[1], c:t.c || 'white'});
+    }
+  }
+  let guard = 0;
+  while(beams.length && guard++ < 400){
+    let b = beams.pop();
+    let x = b.x, y = b.y, dx = b.dx, dy = b.dy, c = b.c;
+    let px = x + .5, py = y + .5, steps = 0;
+    while(steps++ < 300){
+      const nx = x + dx, ny = y + dy;
+      if(nx < 0 || ny < 0 || nx >= W || ny >= H){
+        segs.push({x1:px, y1:py, x2:x + .5 + dx * .5, y2:y + .5 + dy * .5, c});
+        break;
+      }
+      const t = grid.get(nx + ',' + ny);
+      if(!t){ x = nx; y = ny; continue; }
+      const ex = nx + .5 - dx * .5, ey = ny + .5 - dy * .5;
+      if(t.t === 'wall' || t.t === 'emitter'){
+        segs.push({x1:px, y1:py, x2:ex, y2:ey, c}); break;
+      }
+      if(t.t === 'crystal'){
+        segs.push({x1:px, y1:py, x2:ex, y2:ey, c});
+        if(t.c === c) lit.add(t.id);
+        break;
+      }
+      const key = nx + ',' + ny + ',' + dx + ',' + dy + ',' + c;
+      if(seen.has(key)) break;
+      seen.add(key);
+      if(t.t === 'filter'){
+        segs.push({x1:px, y1:py, x2:nx + .5, y2:ny + .5, c});
+        c = t.c; x = nx; y = ny; px = nx + .5; py = ny + .5; continue;
+      }
+      if(t.t === 'portal'){
+        segs.push({x1:px, y1:py, x2:nx + .5, y2:ny + .5, c});
+        const p = partnerOf(lv, t);
+        if(!p) break;
+        x = p.x; y = p.y; px = p.x + .5; py = p.y + .5; continue;
+      }
+      if(t.t === 'mirror'){
+        segs.push({x1:px, y1:py, x2:nx + .5, y2:ny + .5, c});
+        const r = rots[t.id] != null ? rots[t.id] : t.r;
+        let ndx, ndy;
+        if((r & 1) === 0){ ndx = -dy; ndy = -dx; } else { ndx = dy; ndy = dx; }
+        x = nx; y = ny; dx = ndx; dy = ndy; px = nx + .5; py = ny + .5; continue;
+      }
+      if(t.t === 'prism'){
+        segs.push({x1:px, y1:py, x2:nx + .5, y2:ny + .5, c});
+        const r = rots[t.id] != null ? rots[t.id] : t.r;
+        let ndx, ndy;
+        if((r & 1) === 0){ ndx = dy; ndy = -dx; } else { ndx = -dy; ndy = dx; }
+        beams.push({x:nx, y:ny, dx:ndx, dy:ndy, c});
+        x = nx; y = ny; px = nx + .5; py = ny + .5; continue;
+      }
+      break;
+    }
+  }
+  return {segs, lit};
+}
+
+function rotsForMask(lv, mask){
+  const o = {};
+  for(let i = 0; i < lv.rotIds.length; i++) o[lv.rotIds[i]] = (mask >> i) & 1;
+  return o;
+}
+function solvedMask(lv, mask){
+  const r = traceLevel(lv, rotsForMask(lv, mask));
+  return r.lit.size === lv.crystals.length;
+}
+
+/* Solve space: 2^n parity masks. dist[mask] = fewest turns to solve. */
+function solveSpace(lv){
+  if(lv._solve) return lv._solve;
+  const n = lv.rotIds.length, total = 1 << n;
+  const dist = new Int16Array(total).fill(-1);
+  const q = [];
+  for(let m = 0; m < total; m++){
+    if(solvedMask(lv, m)){ dist[m] = 0; q.push(m); }
+  }
+  for(let h = 0; h < q.length; h++){
+    const m = q[h];
+    for(let i = 0; i < n; i++){
+      const nm = m ^ (1 << i);
+      if(dist[nm] === -1){ dist[nm] = dist[m] + 1; q.push(nm); }
+    }
+  }
+  lv._solve = {dist, n};
+  return lv._solve;
+}
+function maskOf(lv, rots){
+  let m = 0;
+  for(let i = 0; i < lv.rotIds.length; i++){
+    if((rots[lv.rotIds[i]] & 1)) m |= (1 << i);
+  }
+  return m;
+}
+function parOf(lv, rots){
+  const s = solveSpace(lv);
+  const d = s.dist[maskOf(lv, rots || lv.startRots)];
+  return d < 0 ? s.n : d;
+}
+function hintMove(lv, rots){
+  const s = solveSpace(lv), m = maskOf(lv, rots);
+  const d = s.dist[m];
+  if(d <= 0) return null;
+  for(let i = 0; i < s.n; i++){
+    if(s.dist[m ^ (1 << i)] === d - 1) return lv.rotIds[i];
+  }
+  return null;
+}
+
+/* ---------------------------------------------------------------- state */
+const G = {
+  i: 0, lv: null, rots: {}, startRots: {}, undo: [], moves: 0,
+  segs: [], lit: new Set(), prevLit: 0,
+  anim: {}, won: false, winAt: 0, hintId: null, hintAt: 0,
+  cursor: -1, cursorOn: false, parts: [], rings: [], flash: 0, t: 0
+};
+
+function loadLevel(i, keepTip){
+  G.i = Math.max(0, Math.min(LEVELS.length - 1, i));
+  const lv = LEVELS[G.i];
+  G.lv = lv;
+  G.rots = {}; G.anim = {}; G.spin = {}; G.undo = [];
+  lv.tiles.forEach(t => {
+    if(t.t === 'mirror' || t.t === 'prism'){
+      G.rots[t.id] = t.r & 1;          // functional state: 0 = "/", 1 = "\"
+      G.anim[t.id] = t.r & 1;          // quarter turns applied (visual target)
+      G.spin[t.id] = t.r & 1;          // eased quarter turns
+    }
+  });
+  G.startRots = Object.assign({}, G.rots);
+  G.moves = 0; G.won = false; G.winAt = 0; G.hintId = null;
+  G.parts = []; G.rings = []; G.cursor = -1; G.cursorOn = false;
+  const res = traceLevel(lv, G.rots);
+  G.segs = res.segs; G.lit = res.lit; G.prevLit = res.lit.size;
+  G.par = parOf(lv, G.startRots);
+  els.name.textContent = lv.name;
+  els.sub.textContent = 'Level ' + (G.i + 1) + ' of ' + LEVELS.length;
+  els.par.textContent = G.par;
+  els.moves.textContent = '0';
+  updateSub();
+  els.moves.parentNode.classList.toggle('hot', false);
+  setTip(lv.tip);
+  updateTools();
+  refreshGrid();
+}
+
+function updateSub(){
+  const total = G.lv ? G.lv.crystals.length : 0;
+  const lit = G.lit ? G.lit.size : 0;
+  els.sub.textContent = 'Level ' + (G.i + 1) + ' of ' + LEVELS.length +
+    (total > 1 ? ' · ' + lit + '/' + total + ' lit' : '');
+}
+function setTip(txt, flash){
+  els.tip.textContent = txt || '';
+  els.tipBar.classList.toggle('flash', !!flash);
+  if(flash){
+    clearTimeout(setTip._t);
+    setTip._t = setTimeout(() => els.tipBar.classList.remove('flash'), 1800);
+  }
+}
+
+function updateTools(){
+  els.undo.classList.toggle('dim', G.undo.length === 0 || G.won);
+  els.hint.classList.toggle('dim', G.won);
+  els.sound.classList.toggle('on', save.sound);
+  els.sound.classList.toggle('off', !save.sound);
+}
+
+function retrace(){
+  const r = traceLevel(G.lv, G.rots);
+  G.segs = r.segs;
+  G.lit = r.lit;
+}
+
+/* ---------------------------------------------------------------- actions */
+function rotate(tile){
+  if(G.won || !tile) return;
+  if(tile.t !== 'mirror' && tile.t !== 'prism') return;
+  G.anim[tile.id] += 1;
+  G.rots[tile.id] = G.anim[tile.id] & 1;
+  G.undo.push(tile.id);
+  G.moves++;
+  els.moves.textContent = G.moves;
+  els.moves.parentNode.classList.toggle('hot', G.moves <= G.par);
+  sfx.turn();
+  if(navigator.vibrate) navigator.vibrate(6);
+  retrace();
+  checkLit();
+  updateSub();
+  updateTools();
+  checkWin();
+}
+
+function checkLit(){
+  const n = G.lit.size;
+  if(n > G.prevLit) sfx.lit(n);
+  G.prevLit = n;
+  els.moves.parentNode.classList.toggle('hot', G.moves <= G.par && G.moves > 0);
+}
+
+function undo(){
+  if(G.won || !G.undo.length) return;
+  const id = G.undo.pop();
+  G.anim[id] -= 1;
+  G.rots[id] = G.anim[id] & 1;
+  G.moves = Math.max(0, G.moves - 1);
+  els.moves.textContent = G.moves;
+  G.hintId = null;
+  sfx.undo();
+  retrace();
+  G.prevLit = G.lit.size;
+  updateSub();
+  updateTools();
+}
+
+function resetLevel(){
+  if(G.won) return;
+  G.rots = Object.assign({}, G.startRots);
+  for(const id in G.rots){ G.anim[id] = G.rots[id]; }
+  G.undo = []; G.moves = 0; G.hintId = null;
+  els.moves.textContent = '0';
+  retrace();
+  G.prevLit = G.lit.size;
+  updateSub();
+  setTip('Level reset.');
+  updateTools();
+}
+
+function doHint(){
+  if(G.won) return;
+  const id = hintMove(G.lv, G.rots);
+  if(!id){ setTip('Nothing to turn — the beam is already complete.', true); return; }
+  G.hintId = id;
+  G.hintAt = performance.now();
+  sfx.hint();
+  setTip('Hint: turn the glowing piece.', true);
+}
+
+function checkWin(){
+  if(G.won) return;
+  if(G.lit.size !== G.lv.crystals.length) return;
+  G.won = true;
+  G.winAt = performance.now();
+  G.flash = 1;
+  sfx.win();
+  if(navigator.vibrate) navigator.vibrate([10, 40, 18]);
+  // burst from every crystal
+  const lv = G.lv;
+  lv.crystals.forEach(c => {
+    const col = COLOR[c.c] || '#fff';
+    G.rings.push({x:c.x + .5, y:c.y + .5, t0:performance.now(), col});
+    for(let k = 0; k < 22; k++){
+      const a = Math.random() * Math.PI * 2, sp = 0.7 + Math.random() * 2.1;
+      G.parts.push({
+        x:c.x + .5, y:c.y + .5, vx:Math.cos(a) * sp, vy:Math.sin(a) * sp - 40,
+        life:1, col, size:1.2 + Math.random() * 2.2
+      });
+    }
+  });
+  updateTools();
+  const stars = G.moves <= G.par ? 3 : G.moves <= G.par + 2 ? 2 : 1;
+  const prev = save.best[G.i];
+  if(!prev || stars > prev.stars || (stars === prev.stars && G.moves < prev.moves)){
+    save.best[G.i] = {moves:G.moves, stars:stars};
+  }
+  save.unlocked = Math.max(save.unlocked, Math.min(LEVELS.length, G.i + 2));
+  persist();
+  setTimeout(() => showWin(stars), 820);
+}
+
+function showWin(stars){
+  const last = G.i === LEVELS.length - 1;
+  els.winTitle.textContent = last ? 'Prism Shift complete' : 'Solved';
+  const starEls = document.querySelectorAll('#win .st');
+  starEls.forEach((s, i) => {
+    s.classList.remove('on');
+    setTimeout(() => { if(i < stars) s.classList.add('on'); }, 160 + i * 190);
+  });
+  const diff = G.moves - G.par;
+  els.winTxt.innerHTML = 'Moves <b>' + G.moves + '</b> · Par <b>' + G.par + '</b> · ' +
+    (diff === 0 ? '<b>perfect route</b>' : diff + ' over par') +
+    (last ? '<br>All ' + LEVELS.length + ' boards lit. ' + totalStars() + '/' + TOTAL_STARS + ' stars.' : '');
+  els.winNext.textContent = last ? 'Level select' : 'Next level';
+  els.winNext.dataset.mode = last ? 'menu' : 'next';
+  els.win.classList.add('show');
+  refreshGrid();
+}
+
+function totalStars(){
+  return Object.values(save.best).reduce((a, b) => a + (b.stars || 0), 0);
+}
+
+/* ---------------------------------------------------------------- menu */
+function refreshGrid(){
+  const grid = els.grid;
+  if(!grid) return;
+  if(grid.children.length !== LEVELS.length){
+    grid.innerHTML = '';
+    LEVELS.forEach((lv, i) => {
+      const b = document.createElement('button');
+      b.className = 'lvl';
+      b.innerHTML = '<span class="n"></span><span class="nm"></span><span class="st"></span>';
+      b.addEventListener('click', () => {
+        if(i >= save.unlocked) return;
+        els.menu.classList.remove('show');
+        els.win.classList.remove('show');
+        loadLevel(i);
+        audio();
+      });
+      grid.appendChild(b);
+    });
+  }
+  LEVELS.forEach((lv, i) => {
+    const b = grid.children[i];
+    const best = save.best[i];
+    const locked = i >= save.unlocked;
+    b.classList.toggle('locked', locked);
+    b.classList.toggle('done', !!best);
+    b.classList.toggle('next', !best && i < save.unlocked);
+    b.querySelector('.n').innerHTML = locked
+      ? '<svg width="12" height="14" viewBox="0 0 12 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="1.2" y="6" width="9.6" height="7" rx="1.8"/><path d="M3.4 6V4.3a2.6 2.6 0 0 1 5.2 0V6"/></svg>'
+      : (i + 1);
+    b.querySelector('.nm').textContent = locked ? 'locked' : lv.name;
+    b.querySelector('.st').textContent = best ? '★★★'.slice(0, best.stars) : '';
+    b.disabled = locked;
+    b.title = locked ? 'Finish the previous level first' : lv.name + (best ? ' — best ' + best.moves + ' moves' : '');
+  });
+  els.starTotal.textContent = totalStars() + ' / ' + TOTAL_STARS + ' stars';
+}
+
+/* ---------------------------------------------------------------- canvas */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let CW = 300, CH = 300, DPR = 1;
+const L = {ox:0, oy:0, cell:40};
+
+function resize(){
+  const r = cv.getBoundingClientRect();
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  CW = Math.max(80, r.width); CH = Math.max(80, r.height);
+  cv.width = Math.round(CW * DPR);
+  cv.height = Math.round(CH * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+new ResizeObserver(resize).observe(cv);
+
+function layout(){
+  const lv = G.lv; if(!lv) return;
+  const pad = Math.min(CW, CH) * 0.045 + 4;
+  const cell = Math.min((CW - pad * 2) / lv.w, (CH - pad * 2) / lv.h);
+  L.cell = cell;
+  L.ox = (CW - cell * lv.w) / 2;
+  L.oy = (CH - cell * lv.h) / 2;
+}
+
+function cellCenter(gx, gy){
+  return [L.ox + (gx + .5) * L.cell, L.oy + (gy + .5) * L.cell];
+}
+function tileCenter(id){
+  const t = G.lv.tiles.find(o => o.id === id);
+  if(!t) return null;
+  const c = cellCenter(t.x, t.y);
+  const r = cv.getBoundingClientRect();
+  return {x: r.left + c[0], y: r.top + c[1]};
+}
+function pointToCell(px, py){
+  const gx = Math.floor((px - L.ox) / L.cell);
+  const gy = Math.floor((py - L.oy) / L.cell);
+  if(gx < 0 || gy < 0 || gx >= G.lv.w || gy >= G.lv.h) return null;
+  return [gx, gy];
+}
+
+/* ---------------------------------------------------------------- drawing */
+function roundRect(c, x, y, w, h, r){
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
+function drawBoard(ts){
+  const lv = G.lv;
+  ctx.save();
+  // board plate
+  const bw = lv.w * L.cell, bh = lv.h * L.cell;
+  const g = ctx.createLinearGradient(L.ox, L.oy, L.ox + bw, L.oy + bh);
+  g.addColorStop(0, 'rgba(20,30,48,.92)');
+  g.addColorStop(1, 'rgba(10,16,28,.94)');
+  ctx.fillStyle = g;
+  roundRect(ctx, L.ox, L.oy, bw, bh, Math.min(16, L.cell * .22));
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.07)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // cells
+  for(let y = 0; y < lv.h; y++){
+    for(let x = 0; x < lv.w; x++){
+      const px = L.ox + x * L.cell, py = L.oy + y * L.cell;
+      if((x + y) & 1){
+        ctx.fillStyle = 'rgba(255,255,255,.014)';
+        ctx.fillRect(px, py, L.cell, L.cell);
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,.028)';
+      ctx.strokeRect(px + .5, py + .5, L.cell - 1, L.cell - 1);
+    }
+  }
+  ctx.restore();
+}
+
+function drawBeams(ts){
+  const cell = L.cell;
+  ctx.save();
+  roundRect(ctx, L.ox, L.oy, G.lv.w * cell, G.lv.h * cell, Math.min(16, cell * .22));
+  ctx.clip();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  const pulse = 0.82 + 0.18 * Math.sin(ts / 420);
+  const boost = G.won ? Math.min(1, (performance.now() - G.winAt) / 600) : 0;
+  for(const s of G.segs){
+    const x1 = L.ox + s.x1 * cell, y1 = L.oy + s.y1 * cell;
+    const x2 = L.ox + s.x2 * cell, y2 = L.oy + s.y2 * cell;
+    const col = COLOR[s.c] || '#fff';
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = 0.055 * pulse + boost * .05;
+    ctx.lineWidth = cell * .34;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.globalAlpha = 0.14 * pulse + boost * .1;
+    ctx.lineWidth = cell * .16;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = Math.max(1.4, cell * .045);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,' + (0.75 + boost * .25) + ')';
+    ctx.lineWidth = Math.max(.8, cell * .018);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function glowDot(x, y, r, col, a){
+  const grd = ctx.createRadialGradient(x, y, 0, x, y, r);
+  grd.addColorStop(0, col);
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalAlpha = a;
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawMirror(t, cx, cy, cell){
+  const r = G.spin[t.id] != null ? G.spin[t.id] : t.r;
+  const ang = r * Math.PI / 2;
+  const s = cell * .30;
+  ctx.save();
+  ctx.translate(cx, cy);
+  // plate
+  ctx.fillStyle = 'rgba(140,200,255,.07)';
+  ctx.beginPath(); ctx.arc(0, 0, cell * .33, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(140,200,255,.16)';
+  ctx.lineWidth = 1; ctx.stroke();
+  ctx.rotate(ang);
+  // mirror bar
+  const grd = ctx.createLinearGradient(-s, s, s, -s);
+  grd.addColorStop(0, '#9fd8ff');
+  grd.addColorStop(.5, '#ffffff');
+  grd.addColorStop(1, '#7fb6ff');
+  ctx.strokeStyle = grd;
+  ctx.lineWidth = cell * .085;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-s, s); ctx.lineTo(s, -s); ctx.stroke();
+  // backing
+  ctx.strokeStyle = 'rgba(120,170,230,.35)';
+  ctx.lineWidth = cell * .03;
+  ctx.beginPath(); ctx.moveTo(-s + cell * .03, s + cell * .045); ctx.lineTo(s + cell * .03, -s + cell * .045); ctx.stroke();
+  ctx.restore();
+}
+
+function drawPrism(t, cx, cy, cell, ts){
+  const r = G.spin[t.id] != null ? G.spin[t.id] : t.r;
+  const h = cell * .30;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = 'rgba(167,139,250,.07)';
+  ctx.beginPath(); ctx.arc(0, 0, cell * .33, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(167,139,250,.2)';
+  ctx.lineWidth = 1; ctx.stroke();
+  // neutral prism silhouette (never points anywhere on its own)
+  ctx.beginPath();
+  ctx.moveTo(0, -h);
+  ctx.lineTo(h * .95, h * .72);
+  ctx.lineTo(-h * .95, h * .72);
+  ctx.closePath();
+  const grd = ctx.createLinearGradient(0, -h, 0, h * .7);
+  grd.addColorStop(0, 'rgba(214,198,255,.96)');
+  grd.addColorStop(1, 'rgba(112,88,214,.8)');
+  ctx.fillStyle = grd;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(236,228,255,.75)';
+  ctx.lineWidth = 1.2; ctx.stroke();
+  // inner refraction facet — rotates 90° per tap, so each turn is visible
+  ctx.save();
+  ctx.clip();
+  ctx.rotate(r * Math.PI / 2);
+  ctx.strokeStyle = 'rgba(255,255,255,.6)';
+  ctx.lineWidth = Math.max(1.2, cell * .034);
+  ctx.beginPath(); ctx.moveTo(-h, h); ctx.lineTo(h, -h); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.16)';
+  ctx.beginPath(); ctx.moveTo(-h, h * .1); ctx.lineTo(h * .1, -h); ctx.stroke();
+  ctx.restore();
+  ctx.globalCompositeOperation = 'lighter';
+  glowDot(0, -h * .55, cell * .16, 'rgba(220,205,255,1)', .28);
+  ctx.restore();
+}
+
+function drawCrystal(t, cx, cy, cell, ts){
+  const on = G.lit.has(t.id);
+  const col = COLOR[t.c] || '#fff';
+  const R = cell * .27;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if(on){
+    const pulse = .55 + .45 * Math.sin(ts / 320 + t.x);
+    ctx.globalCompositeOperation = 'lighter';
+    glowDot(0, 0, cell * .62, col, .30 + .18 * pulse);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  // hexagon gem
+  ctx.beginPath();
+  for(let i = 0; i < 6; i++){
+    const a = -Math.PI / 2 + i * Math.PI / 3;
+    const px = Math.cos(a) * R, py = Math.sin(a) * R;
+    if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  if(on){
+    const grd = ctx.createRadialGradient(0, -R * .2, 0, 0, 0, R);
+    grd.addColorStop(0, '#ffffff');
+    grd.addColorStop(.45, col);
+    grd.addColorStop(1, 'rgba(0,0,0,.35)');
+    ctx.fillStyle = grd; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.95)';
+  } else {
+    const g2 = ctx.createRadialGradient(0, -R * .2, 0, 0, 0, R * 1.05);
+    g2.addColorStop(0, col);
+    g2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = .38;
+    ctx.fillStyle = g2; ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(8,13,22,.72)'; ctx.fill();
+    const g3 = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+    g3.addColorStop(0, 'rgba(255,255,255,.02)');
+    g3.addColorStop(1, col);
+    ctx.globalAlpha = .30;
+    ctx.fillStyle = g3; ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = .78;
+  }
+  ctx.lineWidth = Math.max(1, cell * .022);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // facets
+  ctx.strokeStyle = on ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, -R); ctx.lineTo(0, R);
+  ctx.moveTo(-R * .87, -R * .5); ctx.lineTo(R * .87, R * .5);
+  ctx.moveTo(R * .87, -R * .5); ctx.lineTo(-R * .87, R * .5);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawEmitter(t, cx, cy, cell){
+  const d = DIRS[t.d], col = COLOR[t.c] || '#fff';
+  const s = cell * .30;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(Math.atan2(d[1], d[0]));
+  ctx.fillStyle = 'rgba(255,255,255,.07)';
+  roundRect(ctx, -s, -s, s * 2, s * 2, cell * .07);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.16)';
+  ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(s * .95, 0);
+  ctx.lineTo(s * .1, -s * .6);
+  ctx.lineTo(s * .1, s * .6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalCompositeOperation = 'lighter';
+  glowDot(s * .5, 0, cell * .3, col, .35);
+  ctx.restore();
+}
+
+function drawFilter(t, cx, cy, cell){
+  const s = cell * .30, col = COLOR[t.c] || '#fff';
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  ctx.moveTo(0, -s); ctx.lineTo(s, 0); ctx.lineTo(0, s); ctx.lineTo(-s, 0);
+  ctx.closePath();
+  ctx.fillStyle = col;
+  ctx.globalAlpha = .16; ctx.fill();
+  ctx.globalAlpha = .85;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = Math.max(1.2, cell * .026);
+  ctx.stroke();
+  ctx.globalAlpha = .5;
+  ctx.beginPath(); ctx.moveTo(-s * .45, 0); ctx.lineTo(s * .45, 0); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawWall(t, cx, cy, cell){
+  const s = cell * .40;
+  ctx.save();
+  ctx.translate(cx, cy);
+  const grd = ctx.createLinearGradient(0, -s, 0, s);
+  grd.addColorStop(0, '#1e2a3f');
+  grd.addColorStop(1, '#131c2c');
+  ctx.fillStyle = grd;
+  roundRect(ctx, -s, -s, s * 2, s * 2, cell * .09);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.09)';
+  ctx.lineWidth = 1; ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,0,0,.35)';
+  ctx.beginPath();
+  ctx.moveTo(-s * .6, -s * .1); ctx.lineTo(s * .6, -s * .1);
+  ctx.moveTo(-s * .2, -s * .1); ctx.lineTo(-s * .2, s * .6);
+  ctx.moveTo(s * .3, -s * .1); ctx.lineTo(s * .3, s * .6);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPortal(t, cx, cy, cell, ts){
+  const col = t.pair % 2 === 1 ? '#a78bfa' : '#34d399';
+  ctx.save();
+  ctx.translate(cx, cy);
+  const spin = ts / 900 * (t.pair % 2 ? 1 : -1);
+  ctx.rotate(spin);
+  ctx.strokeStyle = col;
+  ctx.lineWidth = Math.max(1.4, cell * .03);
+  for(let k = 0; k < 3; k++){
+    ctx.globalAlpha = .8 - k * .2;
+    ctx.beginPath();
+    ctx.arc(0, 0, cell * (.12 + k * .075), k * 2.1, k * 2.1 + 2.0);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = .9;
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(0, 0, cell * .045, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
+function drawTiles(ts){
+  const lv = G.lv, cell = L.cell;
+  for(const t of lv.tiles){
+    const [cx, cy] = cellCenter(t.x, t.y);
+    switch(t.t){
+      case 'mirror': drawMirror(t, cx, cy, cell); break;
+      case 'prism': drawPrism(t, cx, cy, cell, ts); break;
+      case 'crystal': drawCrystal(t, cx, cy, cell, ts); break;
+      case 'emitter': drawEmitter(t, cx, cy, cell); break;
+      case 'filter': drawFilter(t, cx, cy, cell); break;
+      case 'wall': drawWall(t, cx, cy, cell); break;
+      case 'portal': drawPortal(t, cx, cy, cell, ts); break;
+    }
+  }
+}
+
+function drawHints(ts){
+  if(G.hintId){
+    const age = (performance.now() - G.hintAt) / 1000;
+    if(age > 3.2){ G.hintId = null; return; }
+    const t = G.lv.tiles.find(o => o.id === G.hintId);
+    if(t){
+      const [cx, cy] = cellCenter(t.x, t.y);
+      const p = .5 + .5 * Math.sin(ts / 180);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(89,224,255,' + (.35 + .45 * p) + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, L.cell * (.34 + .06 * p), 0, 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  if(G.cursorOn && G.cursor >= 0){
+    const x = G.cursor % G.lv.w, y = Math.floor(G.cursor / G.lv.w);
+    const [cx, cy] = cellCenter(x, y);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1.4;
+    roundRect(ctx, cx - L.cell * .44, cy - L.cell * .44, L.cell * .88, L.cell * .88, 8);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawFX(ts, dt){
+  const cell = L.cell;
+  // rings
+  for(let i = G.rings.length - 1; i >= 0; i--){
+    const r = G.rings[i];
+    const age = (performance.now() - r.t0) / 1000;
+    if(age > 1.1){ G.rings.splice(i, 1); continue; }
+    const [cx, cy] = cellCenter(r.x - .5, r.y - .5);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = r.col;
+    ctx.globalAlpha = (1 - age / 1.1) * .55;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(cx, cy, cell * (.3 + age * 1.5), 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+  // particles
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for(let i = G.parts.length - 1; i >= 0; i--){
+    const p = G.parts[i];
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vy += 4.2 * dt; p.vx *= 0.995;
+    p.life -= dt * .9;
+    if(p.life <= 0){ G.parts.splice(i, 1); continue; }
+    const [cx, cy] = cellCenter(p.x - .5, p.y - .5);
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.col;
+    ctx.beginPath(); ctx.arc(cx, cy, p.size, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+  if(G.flash > 0){
+    G.flash = Math.max(0, G.flash - dt * 1.6);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const r0 = Math.max(CW, CH) * .62;
+    const grd = ctx.createRadialGradient(CW / 2, CH / 2, 0, CW / 2, CH / 2, r0);
+    grd.addColorStop(0, 'rgba(168,224,255,' + (G.flash * .20) + ')');
+    grd.addColorStop(.55, 'rgba(130,190,255,' + (G.flash * .07) + ')');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, CW, CH);
+    ctx.restore();
+  }
+}
+
+let last = 0;
+function frame(ts){
+  if(!last) last = ts;
+  const dt = Math.min(.05, (ts - last) / 1000);
+  last = ts;
+  G.t = ts;
+  // ease rotations
+  for(const id in G.anim){
+    const target = G.anim[id];
+    const d = target - (G.spin[id] || 0);
+    G.spin[id] = (G.spin[id] || 0) + d * Math.min(1, dt * 14);
+    if(Math.abs(d) < .002) G.spin[id] = target;
+  }
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, CW, CH);
+  layout();
+  drawBoard(ts);
+  drawBeams(ts);
+  drawTiles(ts);
+  drawHints(ts);
+  drawFX(ts, dt);
+  requestAnimationFrame(frame);
+}
+
+/* ---------------------------------------------------------------- input */
+function cellFromEvent(e){
+  const r = cv.getBoundingClientRect();
+  return pointToCell(e.clientX - r.left, e.clientY - r.top);
+}
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  audio();
+  const c = cellFromEvent(e);
+  if(!c) return;
+  const t = G.lv.grid.get(c[0] + ',' + c[1]);
+  if(t && (t.t === 'mirror' || t.t === 'prism')){
+    rotate(t);
+  } else {
+    G.cursor = c[1] * G.lv.w + c[0];
+    G.cursorOn = true;
+  }
+}, {passive:false});
+
+document.addEventListener('keydown', e => {
+  const k = e.key;
+  if(k === 'Escape'){
+    els.win.classList.remove('show');
+    els.menu.classList.add('show');
+    refreshGrid();
+    return;
+  }
+  if(els.menu.classList.contains('show') || els.win.classList.contains('show')) return;
+  const lv = G.lv;
+  if(!lv) return;
+  if(k === 'u' || k === 'U' || k === 'z' || k === 'Z'){ undo(); e.preventDefault(); return; }
+  if(k === 'r' || k === 'R'){ resetLevel(); e.preventDefault(); return; }
+  if(k === 'h' || k === 'H'){ doHint(); e.preventDefault(); return; }
+  const map = {ArrowLeft:[-1,0], ArrowRight:[1,0], ArrowUp:[0,-1], ArrowDown:[0,1]};
+  if(map[k]){
+    e.preventDefault();
+    if(G.cursor < 0) G.cursor = 0;
+    let x = G.cursor % lv.w, y = Math.floor(G.cursor / lv.w);
+    x = Math.max(0, Math.min(lv.w - 1, x + map[k][0]));
+    y = Math.max(0, Math.min(lv.h - 1, y + map[k][1]));
+    G.cursor = y * lv.w + x;
+    G.cursorOn = true;
+    return;
+  }
+  if(k === ' ' || k === 'Enter'){
+    e.preventDefault();
+    if(G.cursor < 0) return;
+    const x = G.cursor % lv.w, y = Math.floor(G.cursor / lv.w);
+    const t = lv.grid.get(x + ',' + y);
+    if(t) rotate(t);
+  }
+});
+
+/* ---------------------------------------------------------------- wiring */
+const els = {
+  name: document.getElementById('lvName'),
+  sub: document.getElementById('lvSub'),
+  moves: document.getElementById('movesEl'),
+  par: document.getElementById('parEl'),
+  tip: document.getElementById('tipText'),
+  tipBar: document.getElementById('tipBar'),
+  menu: document.getElementById('menu'),
+  win: document.getElementById('win'),
+  grid: document.getElementById('levelGrid'),
+  starTotal: document.getElementById('starTotal'),
+  winTitle: document.getElementById('winTitle'),
+  winTxt: document.getElementById('winTxt'),
+  winNext: document.getElementById('winNext'),
+  undo: document.getElementById('undoBtn'),
+  hint: document.getElementById('hintBtn'),
+  reset: document.getElementById('resetBtn'),
+  sound: document.getElementById('soundBtn')
+};
+
+document.getElementById('menuBtn').addEventListener('click', () => {
+  els.menu.classList.add('show');
+  els.win.classList.remove('show');
+  refreshGrid();
+});
+els.undo.addEventListener('click', () => { audio(); undo(); });
+els.hint.addEventListener('click', () => { audio(); doHint(); });
+els.reset.addEventListener('click', () => { audio(); resetLevel(); });
+els.sound.addEventListener('click', () => {
+  save.sound = !save.sound;
+  persist();
+  updateTools();
+  if(save.sound){ audio(); tone(660, .08, 'sine', .05); }
+});
+document.getElementById('winReplay').addEventListener('click', () => {
+  els.win.classList.remove('show');
+  loadLevel(G.i);
+});
+els.winNext.addEventListener('click', () => {
+  els.win.classList.remove('show');
+  if(els.winNext.dataset.mode === 'menu' || G.i >= LEVELS.length - 1){
+    els.menu.classList.add('show');
+    refreshGrid();
+  } else {
+    loadLevel(G.i + 1);
+  }
+});
+document.getElementById('wipeBtn').addEventListener('click', () => {
+  if(!confirm('Erase all progress and stars?')) return;
+  save.best = {}; save.unlocked = 1; persist();
+  refreshGrid();
+});
+
+/* ---------------------------------------------------------------- boot */
+loadSave();
+resize();
+loadLevel(Math.min(save.unlocked - 1, LEVELS.length - 1));
+updateTools();
+refreshGrid();
+if(!save.seen){
+  save.seen = true;
+  persist();
+} else {
+  els.menu.classList.remove('show');
+}
+requestAnimationFrame(frame);
+
+// expose a small test surface (used by automated checks; harmless in play)
+window.__prism = {
+  G, LEVELS, loadLevel, rotate, undo, resetLevel, doHint, traceLevel,
+  maskOf, hintMove, parOf, solveSpace, save, persist, solvedMask,
+  L, cellCenter, tileCenter, canvas: cv
+};
+</script>
+</body>
+</html>

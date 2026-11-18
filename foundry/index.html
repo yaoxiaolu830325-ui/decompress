@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Valve Foundry — run the night shift</title>
+<meta name="description" content="A small management game about a valve works: take contracts, balance three departments, beat deadlines.">
+<meta name="theme-color" content="#0a0b0d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%230a0b0d'/%3E%3Ccircle cx='32' cy='32' r='15' fill='none' stroke='%23d9a05b' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='4.5' fill='%23d9a05b'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#08090b; --bg2:#0b0d10; --panel:#101216; --panel2:#14171c;
+    --ink:#ece7dc; --ink2:#c9c4b8; --dim:#928e85; --faint:#78746a;
+    --line:rgba(236,231,220,.085); --line2:rgba(236,231,220,.16);
+    --brass:#d9a05b; --brass2:#f2cb92; --copper:#b96f42; --steel:#8ea6bd;
+    --patina:#7fb0a0; --ok:#86b37a; --bad:#d57a70; --warn:#e0a95f;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:"Avenir Next","Helvetica Neue",Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sh:0 1px 0 rgba(255,255,255,.04) inset,0 18px 40px -24px rgba(0,0,0,.9);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(900px 520px at 82% -8%,rgba(217,160,91,.075),transparent 62%),
+      radial-gradient(700px 700px at -10% 108%,rgba(185,111,66,.05),transparent 60%),
+      linear-gradient(180deg,#0a0b0e 0%,var(--bg) 46%,#07080a 100%);
+    color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.5;
+    background-image:linear-gradient(rgba(236,231,220,.022) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(236,231,220,.022) 1px,transparent 1px);
+    background-size:64px 64px;
+    mask-image:radial-gradient(120% 90% at 50% 0%,#000 20%,transparent 78%);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.035;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  h1,h2,h3,h4,p{margin:0}
+  button{font:inherit;color:inherit}
+  a{color:inherit}
+  ::selection{background:rgba(217,160,91,.28)}
+  .wrap{width:100%;max-width:1240px;margin:0 auto;padding:0 26px;position:relative;z-index:1}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* ---------- header ---------- */
+  .hud{position:sticky;top:0;z-index:30;background:rgba(8,9,11,.82);
+    border-bottom:1px solid var(--line);backdrop-filter:blur(14px) saturate(1.1);-webkit-backdrop-filter:blur(14px)}
+  .hud-inner{display:flex;align-items:center;gap:26px;padding-top:14px;padding-bottom:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;min-width:0;flex:0 0 auto}
+  .wheel{width:40px;height:40px;flex:0 0 40px;display:grid;place-items:center;position:relative}
+  .wheel svg{width:40px;height:40px;display:block;animation:spin 64s linear infinite}
+  .wheel::after{content:"";position:absolute;inset:11px;border-radius:50%;background:radial-gradient(circle,#f2cb92 0 18%,#0a0b0d 20% 100%);box-shadow:0 0 22px rgba(217,160,91,.35)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .brand b{display:block;font-size:15px;letter-spacing:.19em;text-transform:uppercase;font-weight:600;white-space:nowrap}
+  .brand i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);margin-top:3px;white-space:nowrap}
+  .stats{display:flex;align-items:stretch;gap:0;margin-left:auto;flex-wrap:wrap}
+  .stat{padding:0 18px;border-left:1px solid var(--line);min-width:92px}
+  .stat:first-child{border-left:0}
+  .stat .k{display:block;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin-bottom:3px}
+  .stat b{display:block;font-family:var(--mono);font-size:17px;font-weight:500;letter-spacing:-.01em;color:var(--ink);line-height:1.15}
+  .stat.rep b{color:var(--brass2)}
+  .meter{height:2px;background:rgba(255,255,255,.09);margin-top:5px;width:100%;overflow:hidden}
+  .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--copper),var(--brass2));width:50%;transition:width .5s}
+  .stat.clock b{color:var(--ink2);font-size:15px}
+  .neg{color:var(--bad)!important}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:none;gap:6px;padding:10px 18px 0;position:sticky;top:0;z-index:29;
+    background:rgba(8,9,11,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .tabs button{appearance:none;background:none;border:0;border-bottom:2px solid transparent;
+    padding:11px 8px 12px;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+    display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;flex:1}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--brass)}
+  .tabs i{font-style:normal;font-family:var(--mono);font-size:9.5px;min-width:16px;height:16px;display:inline-grid;place-items:center;
+    border-radius:20px;background:rgba(236,231,220,.08);color:var(--ink2);padding:0 4px}
+
+  /* ---------- layout ---------- */
+  main{display:grid;grid-template-columns:minmax(0,1.58fr) minmax(0,1fr);
+    grid-template-areas:"orders floor" "goals goals";gap:20px;padding-top:24px;padding-bottom:18px;align-items:start}
+  #view-orders{grid-area:orders}
+  #view-floor{grid-area:floor}
+  #view-goals{grid-area:goals}
+  .panel{background:
+      radial-gradient(120% 80% at 100% 0%,rgba(255,255,255,.022),transparent 60%),
+      linear-gradient(180deg,rgba(20,23,28,.92),rgba(13,15,18,.92));
+    border:1px solid var(--line);border-radius:7px;padding:22px 22px 20px;box-shadow:var(--sh);position:relative}
+  .panel::before{content:"";position:absolute;left:0;right:0;top:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(217,160,91,.45),transparent);opacity:.55}
+  .panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:4px}
+  .eyebrow{display:block;font-size:9px;letter-spacing:.26em;text-transform:uppercase;color:var(--brass);opacity:.9;margin-bottom:7px}
+  h2{font-family:var(--serif);font-weight:400;font-size:29px;letter-spacing:-.015em;line-height:1.05}
+  .lede{color:var(--dim);font-size:12.5px;margin-top:7px;max-width:54ch}
+  .board-timer{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);white-space:nowrap;padding-top:6px}
+  .board-timer b{color:var(--ink2);font-family:var(--mono);font-size:10.5px;letter-spacing:0}
+  .subhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:24px 0 10px;padding-top:16px;border-top:1px solid var(--line)}
+  .subhead h3{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+  .subhead span{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+
+  /* ---------- offers ---------- */
+  .offers{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:12px;margin-top:16px}
+  .offer{position:relative;display:flex;flex-direction:column;gap:12px;padding:15px 15px 14px;
+    background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.008));
+    border:1px solid var(--line);border-radius:5px;transition:border-color .2s,transform .2s,background .2s}
+  .offer:hover{border-color:rgba(236,231,220,.2);transform:translateY(-2px);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012))}
+  .offer.rush{border-color:rgba(217,160,91,.32)}
+  .offer-top{display:flex;align-items:center;gap:7px;min-height:18px}
+  .tag.rush{color:#f0c183;border-color:rgba(224,169,95,.45);background:rgba(224,169,95,.1);letter-spacing:.1em}
+  .ttl{margin-left:auto;font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:0;white-space:nowrap}
+  .offer.rush .ttl{color:var(--warn)}
+  .cust{font-size:11px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;min-width:0}
+  .tag{font-size:8.5px;letter-spacing:.13em;font-weight:600;padding:2px 5px;border-radius:2px;border:1px solid;white-space:nowrap;font-family:var(--mono)}
+  .tag.gate{color:#a9c3d8;border-color:rgba(142,166,189,.4);background:rgba(142,166,189,.09)}
+  .tag.ball{color:#e8bd7d;border-color:rgba(217,160,91,.4);background:rgba(217,160,91,.09)}
+  .tag.reg{color:#9cc7b8;border-color:rgba(127,176,160,.4);background:rgba(127,176,160,.09)}
+  .offer-mid{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+  .offer-mid .big{font-family:var(--serif);font-size:32px;line-height:.95;letter-spacing:-.02em}
+  .offer-mid .big span{font-family:var(--sans);font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);display:block;margin-top:6px}
+  .offer-mid .price{text-align:right;font-family:var(--mono);font-size:15px;color:var(--brass2);line-height:1.1}
+  .offer-mid .price span{display:block;font-family:var(--sans);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:7px 10px;margin:0;padding-top:10px;border-top:1px solid var(--line)}
+  .facts>div{display:flex;justify-content:space-between;gap:6px;align-items:baseline}
+  .facts dt{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);white-space:nowrap}
+  .facts dd{margin:0;font-family:var(--mono);font-size:10.5px;color:var(--ink2);white-space:nowrap}
+  .facts dd.ok{color:var(--ok)}
+  .facts dd.warn{color:var(--warn)}
+  .estimate{font-size:10px;color:var(--faint);line-height:1.45;display:flex;align-items:center;gap:5px;min-height:26px}
+  .estimate .dot{width:4px;height:4px;border-radius:50%;background:var(--faint);flex:0 0 auto}
+  .estimate.tight{color:var(--warn)} .estimate.tight .dot{background:var(--warn)}
+  .estimate.comfy{color:var(--patina)} .estimate.comfy .dot{background:var(--patina)}
+  .offer .btn{margin-top:auto;width:100%}
+
+  /* ---------- buttons ---------- */
+  .btn{appearance:none;border:1px solid transparent;border-radius:3px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    padding:11px 14px;font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;line-height:1;
+    transition:filter .18s,background .18s,border-color .18s,transform .06s;user-select:none;white-space:nowrap}
+  .btn b{font-family:var(--mono);font-weight:500;letter-spacing:0;font-size:10px;opacity:.8}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:linear-gradient(180deg,#e9bd82,#c99254);color:#1c1206;box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 6px 18px -10px rgba(217,160,91,.9)}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.ghost{background:rgba(255,255,255,.028);border-color:var(--line);color:var(--ink2)}
+  .btn.ghost:hover{border-color:rgba(217,160,91,.45);color:var(--ink);background:rgba(217,160,91,.07)}
+  .btn.danger{background:rgba(213,122,112,.1);border-color:rgba(213,122,112,.38);color:#eab3ac}
+  .btn.danger:hover{background:rgba(213,122,112,.18)}
+  .btn:disabled{opacity:.34;cursor:not-allowed;filter:grayscale(.4);transform:none}
+  .btn.sm{padding:8px 9px;font-size:8.5px;letter-spacing:.1em;gap:5px}
+  .btn.sm b{font-size:9.5px}
+  .btn.tiny{padding:5px 7px;font-size:8px;letter-spacing:.1em;border-radius:2px}
+  .btn.wide{width:100%}
+  .linkbtn{appearance:none;background:none;border:0;padding:0;color:var(--dim);font-size:10px;letter-spacing:.08em;
+    text-transform:uppercase;cursor:pointer;border-bottom:1px dotted var(--faint);text-decoration:none}
+  .linkbtn:hover{color:var(--brass2);border-color:var(--brass)}
+
+  /* ---------- jobs ---------- */
+  .jobs{display:flex;flex-direction:column;gap:9px}
+  .job{border:1px solid var(--line);border-radius:5px;padding:12px 13px;background:rgba(255,255,255,.018);position:relative}
+  .job.focused{border-color:rgba(217,160,91,.38);background:linear-gradient(90deg,rgba(217,160,91,.07),rgba(255,255,255,.012) 55%)}
+  .job.urgent{border-color:rgba(213,122,112,.42)}
+  .job-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .job-name{font-size:11.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .job-tools{margin-left:auto;display:flex;gap:4px;flex:0 0 auto}
+  .iconbtn{appearance:none;width:24px;height:24px;border-radius:2px;border:1px solid var(--line);background:transparent;
+    color:var(--dim);display:grid;place-items:center;cursor:pointer;padding:0;transition:.15s}
+  .iconbtn:hover{color:var(--ink);border-color:var(--line2);background:rgba(255,255,255,.04)}
+  .iconbtn.on{color:var(--brass2);border-color:rgba(217,160,91,.5);background:rgba(217,160,91,.1)}
+  .iconbtn svg{width:12px;height:12px;display:block}
+  .track{height:5px;background:rgba(255,255,255,.07);overflow:hidden;border-radius:1px;position:relative}
+  .track i{display:block;height:100%;background:linear-gradient(90deg,#a97341,var(--brass2));width:0;
+    box-shadow:0 0 12px rgba(217,160,91,.35);transition:width .25s linear}
+  .job.urgent .track i{background:linear-gradient(90deg,#9d534b,#e08a7e)}
+  .job-nums{display:flex;justify-content:space-between;align-items:baseline;margin-top:7px;font-size:10px;color:var(--faint);font-family:var(--mono)}
+  .job-nums b{color:var(--ink2);font-weight:500;font-size:11px}
+  .job-nums .due{color:var(--dim)}
+  .job-nums .due.hot{color:var(--bad)}
+  .job-foot{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:3px;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+  .job-foot .pill{color:var(--brass2)}
+  .job-foot .proj{font-family:var(--mono);font-size:9px;letter-spacing:0;text-transform:none;color:var(--faint)}
+  .job-foot .proj.late{color:var(--bad)}
+  .job-foot .proj.ok{color:var(--patina)}
+  .empty{border:1px dashed rgba(236,231,220,.12);border-radius:5px;padding:16px;color:var(--faint);font-size:11.5px;text-align:center;line-height:1.6}
+  .foreman{display:flex;gap:9px;align-items:flex-start;margin-top:14px;padding:11px 12px;border-left:2px solid rgba(217,160,91,.5);
+    background:linear-gradient(90deg,rgba(217,160,91,.055),transparent);font-size:11px;color:var(--dim);line-height:1.55;min-height:44px}
+  .foreman b{color:var(--ink2);font-weight:500}
+  .foreman .who{font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--brass);flex:0 0 auto;padding-top:2px}
+
+  /* ---------- floor ---------- */
+  .shoprate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;margin-top:14px;
+    border:1px solid var(--line);border-radius:4px;background:rgba(0,0,0,.22);flex-wrap:wrap}
+  .shoprate .lbl{font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+  .rates{display:flex;gap:12px;flex-wrap:wrap}
+  .rates span{font-family:var(--mono);font-size:10px;color:var(--dim)}
+  .rates b{color:var(--ink2);font-weight:500}
+  .rates em{font-style:normal;font-size:8px;color:var(--faint)}
+  .badge{display:none;font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:#f0c183;border:1px solid rgba(224,169,95,.45);
+    background:rgba(224,169,95,.09);padding:2px 5px;border-radius:2px;white-space:nowrap}
+  .stage.on .badge{display:inline-block}
+  .stage{padding:14px 0 15px;border-top:1px solid var(--line)}
+  .stage:first-of-type{border-top:0}
+  .stage.on{position:relative}
+  .stage.on::before{content:"";position:absolute;left:-22px;top:14px;bottom:15px;width:2px;background:linear-gradient(180deg,transparent,var(--brass),transparent);opacity:.65}
+  .st-head{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .st-ico{width:30px;height:30px;flex:0 0 30px;border:1px solid var(--line);border-radius:3px;display:grid;place-items:center;color:var(--brass);background:rgba(217,160,91,.05)}
+  .st-ico svg{width:16px;height:16px;display:block}
+  .st-head h3{font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--ink);line-height:1.2}
+  .st-head p{font-size:9px;color:var(--faint);margin-top:2px;letter-spacing:.02em}
+  .st-head .badge{margin-left:auto}
+  .st-meta{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}
+  .st-meta b{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--ink2)}
+  .st-meta span{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .st-meta em{margin-left:auto;font-style:normal;font-family:var(--mono);font-size:10px;color:var(--dim)}
+  .pips{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:8px;min-height:5px}
+  .pips i{width:9px;height:5px;background:rgba(255,255,255,.14);border-radius:1px}
+  .pips i.on{background:linear-gradient(180deg,var(--brass2),var(--copper));box-shadow:0 0 6px rgba(217,160,91,.25)}
+  .pips i.more{width:auto;height:5px;background:none;color:var(--faint);font-size:8px;font-family:var(--mono);line-height:5px}
+  .bar{height:3px;background:rgba(255,255,255,.06);overflow:hidden;border-radius:1px}
+  .bar i{display:block;height:100%;width:0;background:var(--steel);transition:width .3s ease}
+  .stage.on .bar i{background:linear-gradient(90deg,var(--copper),var(--brass2))}
+  .st-act{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+
+  /* ---------- office ---------- */
+  .office{margin-top:6px}
+  .upg{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+  .upg:first-child{border-top:0}
+  .upg .ui{width:26px;height:26px;flex:0 0 26px;border:1px solid var(--line);border-radius:3px;display:grid;place-items:center;color:var(--dim)}
+  .upg .ui svg{width:14px;height:14px}
+  .upg-txt{min-width:0;flex:1}
+  .upg-txt b{display:block;font-size:11px;font-weight:500;color:var(--ink2);letter-spacing:.01em}
+  .upg-txt span{display:block;font-size:9px;color:var(--faint);margin-top:1px;line-height:1.35}
+  .upg-txt span em{font-style:normal;color:var(--patina)}
+  .upg .btn{flex:0 0 auto}
+  .upg.locked{opacity:.55}
+  .overflow{border-top:1px solid var(--line);margin-top:6px;padding-top:13px}
+  .overflow .ol-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .overflow .ol-head h4{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+  .overflow .ol-head span{font-size:9px;color:var(--faint)}
+  .ol-btns{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+  .ol-btns button{appearance:none;background:rgba(255,255,255,.025);border:1px solid var(--line);border-radius:3px;padding:7px 3px;
+    cursor:pointer;font-size:8px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);transition:.15s;line-height:1.35}
+  .ol-btns button b{display:block;font-family:var(--mono);font-size:8px;color:var(--faint);letter-spacing:0;margin-top:2px}
+  .ol-btns button.on{border-color:rgba(217,160,91,.5);background:rgba(217,160,91,.09);color:var(--brass2)}
+  .ol-btns button.on b{color:var(--brass2);opacity:.8}
+  .ol-note{font-size:9px;color:var(--faint);margin-top:7px;line-height:1.5}
+
+  /* ---------- goals ---------- */
+  .goal-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+  .goal{border:1px solid var(--line);border-radius:4px;padding:12px 13px;position:relative;background:rgba(255,255,255,.016)}
+  .goal .no{font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.1em}
+  .goal h4{font-size:11.5px;font-weight:500;color:var(--ink2);margin-top:5px;letter-spacing:.01em}
+  .goal p{font-size:9.5px;color:var(--faint);margin-top:4px;line-height:1.45;min-height:28px}
+  .goal .rw{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding-top:7px;border-top:1px solid var(--line);
+    font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+  .goal .rw b{font-family:var(--mono);font-size:9.5px;color:var(--brass);font-weight:500;letter-spacing:0}
+  .goal.done{border-color:rgba(134,179,122,.28);background:rgba(134,179,122,.04)}
+  .goal.done h4{color:var(--ink)}
+  .goal.done::after{content:"✓";position:absolute;top:10px;right:12px;color:var(--ok);font-size:12px}
+  .goal.done .rw b{color:var(--ok)}
+  .goal .prog{height:2px;background:rgba(255,255,255,.07);margin-top:6px}
+  .goal .prog i{display:block;height:100%;background:var(--ok);width:0}
+
+  /* ---------- footer ---------- */
+  footer{border-top:1px solid var(--line);margin-top:8px;padding:18px 0 34px;color:var(--faint);font-size:10px;letter-spacing:.03em}
+  .foot-in{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center}
+  .foot-in .left{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .save-state{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--faint)}
+  .save-state::before{content:"";width:4px;height:4px;border-radius:50%;background:var(--ok);opacity:.8}
+
+  /* ---------- modal / toast ---------- */
+  .modal{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;padding:20px;
+    background:rgba(4,5,7,.78);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
+  .modal.open{display:flex}
+  .sheet{width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:
+      radial-gradient(120% 90% at 90% 0%,rgba(217,160,91,.07),transparent 60%),
+      linear-gradient(180deg,#15181d,#0d0f12);
+    border:1px solid rgba(236,231,220,.14);border-radius:6px;padding:30px 30px 26px;box-shadow:0 40px 100px -30px #000;
+    position:relative;animation:rise .28s cubic-bezier(.2,.7,.2,1)}
+  @keyframes rise{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+  .sheet::before{content:"";position:absolute;left:18px;right:18px;top:0;height:1px;background:linear-gradient(90deg,transparent,var(--brass),transparent);opacity:.6}
+  .sheet .eyebrow{margin-bottom:9px}
+  .sheet h2{font-size:30px;line-height:1.06;margin-bottom:10px}
+  .sheet p.body{color:var(--dim);font-size:12.5px;line-height:1.65}
+  .rules{list-style:none;margin:18px 0 4px;padding:0;display:flex;flex-direction:column;gap:11px;counter-reset:r}
+  .rules li{display:flex;gap:11px;font-size:11.5px;color:var(--dim);line-height:1.55;counter-increment:r}
+  .rules li::before{content:counter(r,decimal-leading-zero);font-family:var(--mono);font-size:9px;color:var(--brass);
+    border:1px solid rgba(217,160,91,.3);width:22px;height:22px;flex:0 0 22px;display:grid;place-items:center;border-radius:2px;margin-top:1px}
+  .rules b{color:var(--ink2);font-weight:500}
+  .sheet .actions{display:flex;gap:8px;align-items:center;margin-top:22px;flex-wrap:wrap}
+  .sheet .actions .btn.primary{flex:1;min-width:170px;padding:13px 16px}
+  .fine{font-size:9.5px;color:var(--faint);margin-top:14px;line-height:1.55}
+  .diagram{display:flex;align-items:center;justify-content:space-between;gap:4px;margin:18px 0 2px;padding:13px 10px;
+    border:1px solid var(--line);border-radius:4px;background:rgba(0,0,0,.22)}
+  .dnode{text-align:center;flex:1;min-width:0}
+  .dnode .cir{width:26px;height:26px;margin:0 auto 6px;border-radius:50%;border:1px solid rgba(217,160,91,.45);
+    display:grid;place-items:center;color:var(--brass);background:rgba(217,160,91,.06);font-family:var(--mono);font-size:9px}
+  .dnode span{font-size:7.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);display:block;line-height:1.3}
+  .dline{flex:0 0 22px;height:1px;background:linear-gradient(90deg,transparent,rgba(217,160,91,.5),transparent);position:relative}
+  .dline::after{content:"";position:absolute;right:0;top:-2px;border-left:3px solid rgba(217,160,91,.6);border-top:2px solid transparent;border-bottom:2px solid transparent}
+  .offline-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);margin:16px 0 4px;border-radius:4px;overflow:hidden}
+  .offline-grid div{background:#0f1216;padding:11px 13px}
+  .offline-grid dt{font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .offline-grid dd{margin:4px 0 0;font-family:var(--mono);font-size:15px;color:var(--ink2)}
+  .offline-grid dd.hi{color:var(--brass2)}
+
+  #toasts{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:90;display:flex;flex-direction:column;gap:7px;
+    align-items:center;pointer-events:none;width:min(440px,calc(100% - 28px))}
+  .toast{display:flex;align-items:center;gap:8px;background:rgba(18,21,26,.96);border:1px solid rgba(236,231,220,.14);
+    border-radius:3px;padding:9px 13px;font-size:11px;color:var(--ink2);box-shadow:0 14px 40px -16px #000;
+    animation:toastin .25s ease both;max-width:100%;line-height:1.4}
+  .toast .dot{width:5px;height:5px;border-radius:50%;background:var(--brass);flex:0 0 auto}
+  .toast.good .dot{background:var(--ok)} .toast.bad .dot{background:var(--bad)}
+  .toast.out{animation:toastout .3s ease both}
+  @keyframes toastin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes toastout{to{opacity:0;transform:translateY(6px)}}
+
+  :focus-visible{outline:1px solid var(--brass2);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  }
+
+  /* ---------- responsive ---------- */
+  @media (max-width:1080px){
+    .stat{padding:0 12px;min-width:80px}
+    .stat b{font-size:15px}
+    .brand i{display:none}
+  }
+  @media (max-width:900px){
+    .wrap{padding:0 16px}
+    .hud{position:static}
+    .hud-inner{gap:12px;padding-top:12px;padding-bottom:10px}
+    .brand .wheel{width:32px;height:32px;flex-basis:32px}
+    .wheel svg{width:32px;height:32px}
+    .brand b{font-size:12px;letter-spacing:.16em}
+    .stats{width:100%;margin-left:0;display:grid;grid-template-columns:1.1fr 1.35fr .85fr;
+      border-top:1px solid var(--line);padding-top:10px;gap:0}
+    .stat{border-left:0;padding:0 10px 0 0;min-width:0}
+    .stat:nth-child(1),.stat:nth-child(2),.stat:nth-child(3){grid-column:auto}
+    .stat:nth-child(3){display:block;text-align:right;padding-right:0}
+    .stat:nth-child(4){display:none}
+    .stat.clock{display:none}
+    .stat b{font-size:16px}
+    .tabs{display:flex;top:0}
+    main{display:block;padding-top:14px}
+    .panel{display:none;padding:18px 15px 16px;margin-bottom:14px}
+    body[data-view="orders"] #view-orders,
+    body[data-view="floor"] #view-floor,
+    body[data-view="goals"] #view-goals{display:block}
+    .goal-wrap{grid-template-columns:1fr 1fr}
+    .offer-mid .big{font-size:29px}
+    /* active work first once something is committed */
+    body[data-view="orders"] #view-orders{display:flex;flex-direction:column}
+    #view-orders .panel-head,#view-orders .lede{order:0}
+    body.has-jobs #view-orders .subhead{order:1;margin-top:16px;padding-top:0;border-top:0}
+    body.has-jobs #view-orders .jobs{order:2}
+    body.has-jobs #view-orders .offers{order:3;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
+    body.has-jobs #view-orders .foreman{order:4}
+    .btn.sm{min-height:40px;font-size:8.5px}
+    .iconbtn{width:34px;height:34px}
+    .upg .btn{min-width:64px}
+    footer{margin-top:0}
+  }
+  @media (max-width:560px){
+    h2{font-size:25px}
+    .offers{grid-template-columns:1fr}
+    .goal-wrap{grid-template-columns:1fr}
+    .st-act .btn{font-size:8px;padding:9px 6px}
+    .sheet{padding:24px 20px 20px}
+    .sheet h2{font-size:26px}
+    #toasts{bottom:14px}
+  }
+</style>
+</head>
+<body data-view="orders">
+
+<header class="hud">
+  <div class="hud-inner wrap">
+    <a class="brand" href="../" aria-label="Back to Decompress">
+      <span class="wheel" aria-hidden="true">
+        <svg viewBox="0 0 40 40" fill="none" stroke="#d9a05b" stroke-width="1.3">
+          <circle cx="20" cy="20" r="18" opacity=".35"/>
+          <circle cx="20" cy="20" r="6.5" opacity=".6"/>
+          <path d="M20 1.5v9M20 29.5v9M1.5 20h9M29.5 20h9M6.9 6.9l6.4 6.4M26.7 26.7l6.4 6.4M33.1 6.9l-6.4 6.4M13.3 26.7l-6.4 6.4" opacity=".55"/>
+        </svg>
+      </span>
+      <span><b>Valve Foundry</b><i>Est. 1924 · fictional works</i></span>
+    </a>
+    <div class="stats" aria-live="off">
+      <div class="stat"><span class="k">Cash</span><b id="sCash" class="mono">$2,500</b></div>
+      <div class="stat rep"><span class="k">Reputation</span><b id="sRep" class="mono">50</b><div class="meter" aria-hidden="true"><i id="repFill"></i></div></div>
+      <div class="stat"><span class="k">Committed</span><b id="sSlots" class="mono">0 / 2</b></div>
+      <div class="stat"><span class="k">Spot flow / min</span><b id="sFlow" class="mono">$0</b></div>
+      <div class="stat clock"><span class="k" id="sDay">Day 1</span><b id="sTime" class="mono">06:00</b></div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Sections">
+  <button type="button" data-view="orders" class="on">Orders <i id="tabOrders">0</i></button>
+  <button type="button" data-view="floor">Floor</button>
+  <button type="button" data-view="goals">Goals <i id="tabGoals">6</i></button>
+</nav>
+
+<main class="wrap">
+  <section class="panel" id="view-orders" aria-labelledby="ordersTitle">
+    <div class="panel-head">
+      <div>
+        <span class="eyebrow">Order book</span>
+        <h2 id="ordersTitle">Contracts</h2>
+      </div>
+      <div class="board-timer">Enquiries &middot; <b id="boardTimer">4 / 4</b></div>
+    </div>
+    <p class="lede">Fixed quantity, fixed price, hard deadline. Materials are paid the moment you accept.</p>
+    <div id="offers" class="offers"></div>
+    <div class="subhead">
+      <h3>On the floor</h3>
+      <span id="jobSlots" class="mono">0 / 2 committed</span>
+    </div>
+    <div id="jobs" class="jobs"></div>
+    <p class="foreman"><span class="who">Foreman</span><span id="foreman">Take an order. The floor is idle and the men are on the clock.</span></p>
+  </section>
+
+  <section class="panel" id="view-floor" aria-labelledby="floorTitle">
+    <div class="panel-head">
+      <div>
+        <span class="eyebrow">Shop floor</span>
+        <h2 id="floorTitle">The line</h2>
+      </div>
+      <div class="board-timer">Utilisation &middot; <b id="utilTop">0%</b></div>
+    </div>
+    <div class="shoprate">
+      <span class="lbl">Shop rate</span>
+      <div class="rates">
+        <span><b id="rateGate">0</b><em>/min</em> gate</span>
+        <span><b id="rateBall">0</b><em>/min</em> ball</span>
+        <span><b id="rateReg">0</b><em>/min</em> reg</span>
+      </div>
+    </div>
+    <div id="stages"></div>
+    <div class="overflow">
+      <div class="ol-head">
+        <h4>Spare capacity</h4>
+        <span>spot market</span>
+      </div>
+      <div class="ol-btns" id="overflowBtns"></div>
+      <p class="ol-note" id="olNote">Idle stations build for the spot market and sell at once. Thin margins, but it keeps cash moving.</p>
+    </div>
+    <div class="subhead" style="margin-bottom:4px">
+      <h3>Office</h3>
+      <span id="officeMeta">upgrades</span>
+    </div>
+    <div class="office" id="office"></div>
+  </section>
+
+  <section class="panel" id="view-goals" aria-labelledby="goalsTitle">
+    <div class="panel-head">
+      <div>
+        <span class="eyebrow">The long game</span>
+        <h2 id="goalsTitle">Works charter</h2>
+      </div>
+      <div class="board-timer">Lifetime &middot; <b id="lifeRev">$0</b></div>
+    </div>
+    <p class="lede">Six marks of a works worth buying. Each one pays out and opens the next door.</p>
+    <div class="goal-wrap" id="goals"></div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot-in">
+    <div class="left">
+      <span class="save-state" id="saveState">Autosaved locally</span>
+      <button class="linkbtn" type="button" data-act="help">Rules &amp; reset</button>
+      <a class="linkbtn" href="../">← Decompress</a>
+    </div>
+    <span>Valve Foundry · a fictional works · one file, no tracking</span>
+  </div>
+</footer>
+
+<div id="toasts" aria-live="polite" aria-atomic="false"></div>
+
+<!-- onboarding -->
+<div class="modal" id="mIntro" role="dialog" aria-modal="true" aria-labelledby="introTitle">
+  <div class="sheet">
+    <span class="eyebrow">Employee handbook · page one</span>
+    <h2 id="introTitle">Keep the wheels turning.</h2>
+    <p class="body">You have bought a small valve works: three departments, one shared floor, and a reputation to build. No engineers, no calculators — just orders, metal and the clock.</p>
+    <div class="diagram" aria-hidden="true">
+      <div class="dnode"><div class="cir">01</div><span>Machining</span></div>
+      <div class="dline"></div>
+      <div class="dnode"><div class="cir">02</div><span>Assembly</span></div>
+      <div class="dline"></div>
+      <div class="dnode"><div class="cir">03</div><span>Testing</span></div>
+    </div>
+    <ol class="rules">
+      <li><span><b>Take orders from the book.</b> Each carries a quantity, a unit price and a hard deadline. Reputation opens better clients.</span></li>
+      <li><span><b>Materials are cash, up front.</b> You pay the supplier when you accept. Deliver to collect the full order value.</span></li>
+      <li><span><b>The slowest department sets the pace.</b> Orders queue on the same machines, so a second order waits behind the first. The queue projection on every job tells you the truth.</span></li>
+      <li><span><b>Deadlines are real.</b> Ship late and the order is lost: salvage prices, a reputation hit, no payment. The shop saves itself, and runs a reduced night shift for up to 4 hours while you are away.</span></li>
+    </ol>
+    <div class="actions">
+      <button class="btn primary" type="button" data-act="start">Open the works</button>
+    </div>
+    <p class="fine">Autosaves to this browser only. Contract clocks pause while the tab is closed; a reduced night shift keeps the machines moving.</p>
+  </div>
+</div>
+
+<!-- help -->
+<div class="modal" id="mHelp" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="sheet">
+    <span class="eyebrow">Works rules</span>
+    <h2 id="helpTitle">The ledger, explained.</h2>
+    <ol class="rules">
+      <li><span><b>Capacity.</b> Each station delivers one station-second per second. A gate valve needs 8s machining, 5s assembly, 4s testing; ball valves and regulators need more. Your line rate is the slowest of the three.</span></li>
+      <li><span><b>Cash &amp; materials.</b> Accepting an order reserves its materials immediately. Delivery pays the order value. Spare capacity feeds the spot market at auction prices.</span></li>
+      <li><span><b>Reputation.</b> On-time work earns 2–5 points. Missed deadlines cost 6; abandoned orders cost 8. Better reputation means better prices and bigger clients.</span></li>
+      <li><span><b>Demand.</b> Spot prices drift with each product's cycle and occasional demand spikes. Contract prices are locked when the offer appears.</span></li>
+      <li><span><b>Saving.</b> Autosaves every few seconds and when you leave. The night shift runs at 35% pace for up to 4 hours; deadlines pause while you are away.</span></li>
+    </ol>
+    <div class="actions">
+      <button class="btn primary" type="button" data-act="closeModal">Back to work</button>
+      <button class="btn danger" type="button" data-act="resetAsk">Reset works</button>
+    </div>
+    <p class="fine">Reset erases this browser's save permanently. The game is a work of fiction; all clients and companies are invented.</p>
+  </div>
+</div>
+
+<!-- reset -->
+<div class="modal" id="mReset" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
+  <div class="sheet">
+    <span class="eyebrow">Point of no return</span>
+    <h2 id="resetTitle">Sell the works?</h2>
+    <p class="body">Cash, orders, upgrades and reputation will be cleared. The building starts again at 06:00 with two machining stations, three assembly benches and two test rigs.</p>
+    <div class="actions">
+      <button class="btn danger" type="button" data-act="resetConfirm">Yes, start over</button>
+      <button class="btn ghost" type="button" data-act="closeModal">Keep playing</button>
+    </div>
+  </div>
+</div>
+
+<!-- offline -->
+<div class="modal" id="mOffline" role="dialog" aria-modal="true" aria-labelledby="offlineTitle">
+  <div class="sheet">
+    <span class="eyebrow">Night shift report</span>
+    <h2 id="offlineTitle">The machines kept turning.</h2>
+    <p class="body">You were away. The floor ran a reduced night shift; contract clocks were paused so nothing slipped while you were gone.</p>
+    <dl class="offline-grid" id="offlineStats"></dl>
+    <p class="fine" id="offlineFine"></p>
+    <div class="actions">
+      <button class="btn primary" type="button" data-act="closeModal">Back to the floor</button>
+    </div>
+  </div>
+</div>
+
+<!-- win -->
+<div class="modal" id="mWin" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+  <div class="sheet">
+    <span class="eyebrow">Charter granted</span>
+    <h2 id="winTitle">A works worth buying.</h2>
+    <p class="body">Sixty thousand in lifetime revenue, a reputation above reproach, and a floor that runs without you standing over it. The bank has approved the charter; the sign over the gate is yours.</p>
+    <dl class="offline-grid" id="winStats"></dl>
+    <p class="fine">You can keep trading — bigger orders, tighter clocks, a floor to be proud of.</p>
+    <div class="actions">
+      <button class="btn primary" type="button" data-act="closeModal">Keep the wheels turning</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   VALVE FOUNDRY — engine
+   Continuous-flow shop model. Every stage has stations that each
+   supply 1 station-second per second; a unit consumes fixed
+   station-seconds per department. Line rate = slowest stage.
+   ============================================================ */
+'use strict';
+
+const SAVE_KEY = 'valveFoundry.save.v1';
+const OFFLINE_CAP = 4 * 3600;
+const OFFLINE_EFF = 0.35;
+const START_STATIONS = { mach: 2, asm: 3, test: 2 };
+const START_CASH = 2500;
+
+const STAGES = [
+  { k: 'mach', f: 'm', name: 'Machining', sub: 'Turning bodies & seats' },
+  { k: 'asm',  f: 'a', name: 'Assembly',  sub: 'Seals, stems & fittings' },
+  { k: 'test', f: 't', name: 'Testing',   sub: 'Pressure & leak bench' }
+];
+
+const PRODUCTS = {
+  gate: { key: 'gate', name: 'Gate Valve',        plural: 'gate valves',        code: 'GV', m: 8,  a: 5,  t: 4,  mat: 12, fair: 44,  phase: 0.7 },
+  ball: { key: 'ball', name: 'Ball Valve',        plural: 'ball valves',        code: 'BV', m: 12, a: 8,  t: 7,  mat: 30, fair: 105, phase: 2.4 },
+  reg:  { key: 'reg',  name: 'Pressure Regulator', plural: 'pressure regulators', code: 'PR', m: 18, a: 11, t: 10, mat: 68, fair: 195, phase: 4.9 }
+};
+
+const CUSTOMERS = [
+  'Northgate Water', 'Kestrel Brewing', 'Halden Chemical', 'Portside Marine',
+  'Ferroworks Rail', 'Cobalt Energy', 'Arden Paper', 'Marlowe Heating',
+  'Tessin Foods', 'Ostrava Mining', 'Blue Harbour Desal', 'Vantage HVAC',
+  'Lumen Pharma', 'Greyline Transit', 'Cedar Mill', 'Solace Hotels',
+  'Bracken Distillery', 'Orme Foundry Supply', 'Pinewood Laundry', 'Aster Labs'
+];
+
+const STATION_BASE = { mach: 650, asm: 480, test: 820 };
+const SPEED_BASE   = { mach: 900, asm: 700, test: 1150 };
+const SPEED_MAX    = 10;
+const DESK_COSTS   = [2400, 5600, 12000];
+const SALES_MAX    = 5;
+const TOOL_MAX     = 8;
+const SUPPLY_MAX   = 6;
+
+const MILESTONES = [
+  { name: 'First Cast',        desc: 'Deliver your first contract',              need: s => s.contracts >= 1,   reward: 600 },
+  { name: 'Word Travels',      desc: 'Complete four contracts on time',          need: s => s.onTime >= 4,      reward: 1500, rep: 5 },
+  { name: 'Balanced Floor',    desc: 'Three stations in every department',       need: s => s.stations.mach >= 3 && s.stations.asm >= 3 && s.stations.test >= 3, reward: 2500 },
+  { name: 'Running Hot',       desc: 'Ship 250 valves, any way you like',        need: s => s.units >= 250,     reward: 5000 },
+  { name: 'Upmarket',          desc: 'Ship twelve regulators on time',           need: s => s.regOnTime >= 12,  reward: 8000, rep: 5 },
+  { name: 'Chartered Supplier', desc: 'Every mark above, $60k lifetime revenue and 75 reputation', need: s => s.milestones[0] && s.milestones[1] && s.milestones[2] && s.milestones[3] && s.milestones[4] && s.lifetime >= 60000 && s.rep >= 75, reward: 12000, win: true }
+];
+
+let S = null;
+let SILENT = false;
+let UI_DIRTY = true;
+let lastFrameAt = 0;
+
+/* ---------- formatting ---------- */
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const rand = (a, b) => a + Math.random() * (b - a);
+const money = n => (n < 0 ? '-$' : '$') + Math.round(Math.abs(n)).toLocaleString('en-US');
+function moneyShort(n) {
+  const a = Math.abs(n);
+  if (a >= 1e6) return (n < 0 ? '-$' : '$') + (a / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (a >= 1e4) return (n < 0 ? '-$' : '$') + (a / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+  return money(n);
+}
+function fmtTime(sec) {
+  const t = Math.max(0, Math.ceil(sec));
+  return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+}
+function shiftClock() {
+  const day = 1 + Math.floor(S.t / 600);
+  const mins = 6 * 60 + ((S.t % 600) / 600) * 600;
+  const h = Math.floor(mins / 60), m = Math.floor(mins % 60);
+  return { day, time: String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') };
+}
+
+/* ---------- state ---------- */
+function freshState() {
+  const now = Date.now();
+  return {
+    v: 1, cash: START_CASH, rep: 50, t: 0,
+    stations: { mach: 2, asm: 3, test: 2 },
+    speed: { mach: 0, asm: 0, test: 0 },
+    tooling: 0, desk: 0, sales: 0, supply: 0,
+    overflow: 'gate',
+    jobs: [], offers: [], offerIn: 6, nextId: 1,
+    lifetime: 0, units: 0, contracts: 0, onTime: 0, failed: 0, abandoned: 0, regOnTime: 0,
+    milestones: [false, false, false, false, false, false],
+    won: false, introSeen: false, flow: 0,
+    spike: null, spikeIn: 95 + Math.random() * 70,
+    savedAt: now
+  };
+}
+
+function loadGame() {
+  let raw = null;
+  try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { return null; }
+  if (!raw) return null;
+  let d;
+  try { d = JSON.parse(raw); } catch (e) { return null; }
+  if (!d || d.v !== 1) return null;
+  const f = freshState();
+  const s = Object.assign(f, d);
+  s.stations = Object.assign({ mach: 2, asm: 3, test: 2 }, d.stations || {});
+  s.speed = Object.assign({ mach: 0, asm: 0, test: 0 }, d.speed || {});
+  s.stations.mach = Math.max(1, Math.floor(+s.stations.mach || 2));
+  s.stations.asm = Math.max(1, Math.floor(+s.stations.asm || 3));
+  s.stations.test = Math.max(1, Math.floor(+s.stations.test || 2));
+  for (const k of ['mach', 'asm', 'test']) s.speed[k] = clamp(Math.floor(+s.speed[k] || 0), 0, SPEED_MAX);
+  s.tooling = clamp(Math.floor(+s.tooling || 0), 0, TOOL_MAX);
+  s.desk = clamp(Math.floor(+s.desk || 0), 0, 3);
+  s.sales = clamp(Math.floor(+s.sales || 0), 0, SALES_MAX);
+  s.supply = clamp(Math.floor(+s.supply || 0), 0, SUPPLY_MAX);
+  s.cash = Math.max(0, +s.cash || 0);
+  s.rep = clamp(+s.rep || 0, 0, 100);
+  s.t = Math.max(0, +s.t || 0);
+  s.lifetime = Math.max(0, +s.lifetime || 0);
+  s.units = Math.max(0, +s.units || 0);
+  s.contracts = Math.max(0, Math.floor(+s.contracts || 0));
+  s.onTime = Math.max(0, Math.floor(+s.onTime || 0));
+  s.failed = Math.max(0, Math.floor(+s.failed || 0));
+  s.abandoned = Math.max(0, Math.floor(+s.abandoned || 0));
+  s.regOnTime = Math.max(0, Math.floor(+s.regOnTime || 0));
+  s.jobs = Array.isArray(d.jobs) ? d.jobs.filter(j => j && PRODUCTS[j.p]).map(j => {
+    const qty = Math.max(1, +j.qty || 1);
+    const deadline = Math.max(5, +j.deadline || 60);
+    return {
+      id: +j.id || 0, p: j.p, qty,
+      units: clamp(+j.units || 0, 0, qty),
+      price: Math.max(1, +j.price || 1),
+      value: Math.max(1, +j.value || 1),
+      matCost: Math.max(0, +j.matCost || 0),
+      deadline, left: clamp(+j.left || deadline, 0, deadline),
+      name: String(j.name || 'Client'),
+      rush: !!j.rush, focus: !!j.focus,
+      warned60: !!j.warned60, warned20: !!j.warned20
+    };
+  }) : [];
+  s.offers = Array.isArray(d.offers) ? d.offers.filter(o => o && PRODUCTS[o.p]).map(o => {
+    const deadline = Math.max(5, +o.deadline || 60);
+    return {
+      id: +o.id || 0, p: o.p, qty: Math.max(1, +o.qty || 1),
+      price: Math.max(1, +o.price || 1), value: Math.max(1, +o.value || 1),
+      matCost: Math.max(0, +o.matCost || 0), net: +o.net || 0,
+      deadline, ttl: Math.max(0, +o.ttl || 0),
+      name: String(o.name || 'Client'), rush: !!o.rush
+    };
+  }) : [];
+  s.nextId = Math.max(1, Math.floor(+s.nextId || 1));
+  s.milestones = Array.isArray(d.milestones) && d.milestones.length === 6 ? d.milestones.map(Boolean) : [false, false, false, false, false, false];
+  s.spike = d.spike && PRODUCTS[d.spike.p] ? { p: d.spike.p, left: Math.max(0, +d.spike.left || 0) } : null;
+  s.spikeIn = Math.max(0, +s.spikeIn || 60);
+  s.savedAt = +d.savedAt || Date.now();
+  s.flow = 0;
+  return s;
+}
+
+function saveGame() {
+  if (!S) return;
+  try {
+    S.savedAt = Date.now();
+    localStorage.setItem(SAVE_KEY, JSON.stringify(S));
+    if (typeof updateSaveState === 'function') updateSaveState();
+  } catch (e) { /* private mode: keep playing */ }
+}
+
+/* ---------- capacity & economy ---------- */
+function speedMult(k) { return 1 + 0.10 * S.speed[k] + 0.05 * S.tooling; }
+function cap() {
+  return {
+    mach: S.stations.mach * speedMult('mach'),
+    asm:  S.stations.asm  * speedMult('asm'),
+    test: S.stations.test * speedMult('test')
+  };
+}
+function rateOf(pkey) {
+  const P = PRODUCTS[pkey], c = cap();
+  return Math.min(c.mach / P.m, c.asm / P.a, c.test / P.t);
+}
+function bottleneckOf(pkey) {
+  const P = PRODUCTS[pkey], c = cap();
+  const vals = { mach: c.mach / P.m, asm: c.asm / P.a, test: c.test / P.t };
+  let best = 'mach';
+  for (const k of ['asm', 'test']) if (vals[k] < vals[best] - 1e-9) best = k;
+  return best;
+}
+function unitMatCost(pkey) { return PRODUCTS[pkey].mat * (1 - 0.03 * S.supply); }
+function market(pkey) {
+  const P = PRODUCTS[pkey];
+  let m = 1 + 0.085 * Math.sin(S.t / 68 + P.phase) + 0.04 * Math.sin(S.t / 191 + P.phase * 1.7);
+  if (S.spike && S.spike.p === pkey && S.spike.left > 0) m *= 1.35;
+  return m;
+}
+function spotPrice(pkey) { return PRODUCTS[pkey].fair * 0.56 * market(pkey); }
+function repPriceMult() { return 1 + (S.rep - 50) / 230; }
+function salesMult() { return 1 + 0.06 * S.sales; }
+function maxSlots() { return 2 + S.desk; }
+function maxOffers() { return 4 + (S.sales >= 2 ? 1 : 0) + (S.desk >= 2 ? 1 : 0); }
+
+function stationCost(k) { return Math.round(STATION_BASE[k] * Math.pow(1.42, S.stations[k] - START_STATIONS[k])); }
+function speedCost(k)   { return Math.round(SPEED_BASE[k] * Math.pow(1.78, S.speed[k])); }
+function deskCost()     { return DESK_COSTS[S.desk] || 0; }
+function salesCost()    { return Math.round(1400 * Math.pow(1.8, S.sales)); }
+function toolCost()     { return Math.round(1700 * Math.pow(1.85, S.tooling)); }
+function supplyCost()   { return Math.round(1000 * Math.pow(1.75, S.supply)); }
+
+/* ---------- offers ---------- */
+function unlockedProducts() {
+  const out = ['gate'];
+  if (S.rep >= 55) out.push('ball');
+  if (S.rep >= 70) out.push('reg');
+  return out;
+}
+function pickProduct() {
+  const pool = unlockedProducts();
+  const weights = { gate: 0.62, ball: 0.26, reg: 0.16 };
+  let total = 0;
+  const rows = pool.map(k => {
+    const w = weights[k] * (0.72 + 0.55 * market(k));
+    total += w; return [k, w];
+  });
+  let r = Math.random() * total;
+  for (const [k, w] of rows) { if ((r -= w) <= 0) return k; }
+  return pool[pool.length - 1];
+}
+function pickName() {
+  const used = new Set(S.offers.map(o => o.name).concat(S.jobs.map(j => j.name)));
+  const pool = CUSTOMERS.filter(n => !used.has(n));
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)] : CUSTOMERS[Math.floor(Math.random() * CUSTOMERS.length)];
+}
+
+/* order sizes are absolute, not a treadmill: as the floor gets faster the
+   same order takes less time, which is what upgrades are for. Reputation
+   brings larger clients, and rush work is sized against the current floor. */
+const SIZE_RANGE = { gate: [42, 80], ball: [18, 38], reg: [9, 20] };
+const WINDOW_RANGE = { gate: [300, 390], ball: [330, 435], reg: [390, 500] };
+
+function genOffer(rush) {
+  const pkey = pickProduct();
+  const P = PRODUCTS[pkey];
+  const rate = Math.max(0.02, rateOf(pkey));
+  const repScale = 0.86 + clamp(S.rep, 0, 100) / 100 * 0.62;
+  const size = SIZE_RANGE[pkey];
+  let qty = Math.max(6, Math.round(rand(size[0], size[1]) * repScale));
+  const win = WINDOW_RANGE[pkey];
+  let deadline = Math.round(rand(win[0], win[1]));
+  if (rush) {
+    qty = Math.max(6, Math.round(qty * 0.62));
+    deadline = Math.max(80, Math.round(qty / rate * 1.12 + 20));
+  }
+  /* never issue a standard order that cannot be run by a dedicated floor */
+  if (!rush) deadline = Math.max(deadline, Math.round(qty / rate * 1.35 + 25));
+  const price = Math.max(3, Math.round(P.fair * market(pkey) * repPriceMult() * salesMult() * (rush ? 1.34 : 1) * (0.97 + Math.random() * 0.06)));
+  const value = qty * price;
+  const matCost = Math.round(qty * unitMatCost(pkey));
+  return {
+    id: S.nextId++, p: pkey, qty, price, value, matCost, net: value - matCost,
+    deadline, ttl: Math.round(52 + Math.random() * 32),
+    name: pickName(), rush: !!rush
+  };
+}
+
+function refillOffers(force) {
+  while (S.offers.length < maxOffers()) {
+    S.offers.push(genOffer(Math.random() < 0.16));
+    if (!force) break;
+  }
+  UI_DIRTY = true;
+}
+
+function tickOffers(dt) {
+  /* reputation can fall and lock a product again; never leave a locked line selected */
+  if (S.overflow && !unlockedProducts().includes(S.overflow)) {
+    S.overflow = 'gate';
+    UI_DIRTY = true;
+  }
+  /* demand spike */
+  if (S.spike) {
+    S.spike.left -= dt;
+    if (S.spike.left <= 0) S.spike = null;
+  } else {
+    S.spikeIn -= dt;
+    if (S.spikeIn <= 0) {
+      const pool = unlockedProducts();
+      const p = pool[Math.floor(Math.random() * pool.length)];
+      S.spike = { p, left: 48 };
+      S.spikeIn = 110 + Math.random() * 90;
+      if (!SILENT) toast('Demand spike: ' + PRODUCTS[p].plural + ' +35% for 48s', 'good');
+      UI_DIRTY = true;
+    }
+  }
+  /* board */
+  for (const o of S.offers) o.ttl -= dt;
+  const before = S.offers.length;
+  S.offers = S.offers.filter(o => o.ttl > 0);
+  if (S.offers.length !== before) UI_DIRTY = true;
+  S.offerIn -= dt;
+  if (S.offerIn <= 0 && S.offers.length < maxOffers()) {
+    S.offers.push(genOffer(Math.random() < 0.16));
+    S.offerIn = 5 + Math.random() * 5;
+    UI_DIRTY = true;
+  }
+}
+
+/* ---------- contracts ---------- */
+function acceptOffer(id) {
+  const o = S.offers.find(x => x.id === id);
+  if (!o) return false;
+  if (S.jobs.length >= maxSlots()) { toast('Every line is committed. Finish or release an order first.'); return false; }
+  if (S.cash < o.matCost) { toast('Need ' + money(o.matCost) + ' for materials. Cash: ' + money(S.cash) + '.'); return false; }
+  S.cash -= o.matCost;
+  S.jobs.push({
+    id: o.id, p: o.p, qty: o.qty, units: 0, price: o.price, value: o.value,
+    matCost: o.matCost, deadline: o.deadline, left: o.deadline,
+    name: o.name, rush: o.rush, focus: false, warned60: false, warned20: false
+  });
+  S.offers = S.offers.filter(x => x.id !== id);
+  toast('Order accepted · ' + o.qty + ' ' + PRODUCTS[o.p].plural + ' for ' + o.name + '. Materials ' + money(o.matCost) + '.', 'good');
+  UI_DIRTY = true;
+  return true;
+}
+
+function setFocus(id) {
+  S.jobs.forEach(j => { j.focus = (j.id === id) ? !j.focus : false; });
+  UI_DIRTY = true;
+}
+
+function abandonJob(id) {
+  const j = S.jobs.find(x => x.id === id);
+  if (!j) return;
+  const salvage = j.units * j.price * 0.55;
+  const refund = (j.qty - j.units) * unitMatCost(j.p) * 0.5;
+  S.cash += salvage + refund;
+  S.lifetime += salvage;
+  S.rep = clamp(S.rep - 8, 0, 100);
+  S.abandoned++;
+  S.jobs = S.jobs.filter(x => x.id !== id);
+  toast('Order released to ' + j.name + '. Salvage ' + money(salvage) + ', reputation -8.', 'bad');
+  UI_DIRTY = true;
+}
+
+function completeJob(j) {
+  S.jobs = S.jobs.filter(x => x.id !== j.id);
+  S.cash += j.value;
+  S.lifetime += j.value;
+  S.units += j.qty;
+  S.contracts++;
+  S.onTime++;
+  if (j.p === 'reg') S.regOnTime += Math.round(j.qty);
+  const repGain = 2 + 3 * clamp(j.left / Math.max(1, j.deadline), 0, 1);
+  S.rep = clamp(S.rep + repGain, 0, 100);
+  if (!SILENT) toast('Delivered ' + j.qty + ' ' + PRODUCTS[j.p].plural + ' to ' + j.name + ' · +' + money(j.value), 'good');
+  UI_DIRTY = true;
+}
+
+function failJob(j) {
+  S.jobs = S.jobs.filter(x => x.id !== j.id);
+  const salvage = j.units * j.price * 0.55;
+  const refund = (j.qty - j.units) * unitMatCost(j.p) * 0.5;
+  S.cash += salvage + refund;
+  S.lifetime += salvage;
+  S.rep = clamp(S.rep - 6, 0, 100);
+  S.failed++;
+  if (!SILENT) toast('Deadline missed at ' + j.name + '. Salvage ' + money(salvage) + ', reputation -6.', 'bad');
+  UI_DIRTY = true;
+}
+
+/* ---------- simulation ---------- */
+const UTIL = { mach: 0, asm: 0, test: 0 };
+
+function jobOrder(a, b) {
+  return (b.focus ? 1 : 0) - (a.focus ? 1 : 0) || a.left - b.left;
+}
+
+/* Orders run in priority order on a shared floor, so projected finish time
+   is the cumulative work of everything ahead of it. */
+function projectJobs() {
+  const c = cap();
+  let t = 0;
+  const out = {};
+  for (const j of S.jobs.slice().sort(jobOrder)) {
+    const P = PRODUCTS[j.p];
+    const solo = Math.max(1e-6, Math.min(c.mach / P.m, c.asm / P.a, c.test / P.t));
+    const dur = (j.qty - j.units) / solo;
+    t += dur;
+    out[j.id] = { finishIn: t, slack: j.left - t, dur, solo };
+  }
+  return out;
+}
+
+function simulate(dt, offline) {
+  if (!(dt > 0)) return;
+  S.t += dt;
+  const c = cap();
+  const eff = offline ? OFFLINE_EFF : 1;
+  const avail = { mach: c.mach * eff, asm: c.asm * eff, test: c.test * eff };
+  const used = { mach: 0, asm: 0, test: 0 };
+
+  const jobs = S.jobs.slice().sort(jobOrder);
+
+  for (const j of jobs) {
+    const P = PRODUCTS[j.p];
+    const need = j.qty - j.units;
+    if (need <= 1e-7) { completeJob(j); continue; }
+    let rate = Math.min(avail.mach / P.m, avail.asm / P.a, avail.test / P.t, need / dt);
+    if (rate <= 0) continue;
+    const prod = rate * dt;
+    avail.mach -= prod * P.m;
+    avail.asm  -= prod * P.a;
+    avail.test -= prod * P.t;
+    used.mach  += prod * P.m;
+    used.asm   += prod * P.a;
+    used.test  += prod * P.t;
+    j.units = Math.min(j.qty, j.units + prod);
+    if (j.units >= j.qty - 1e-7) { j.units = j.qty; completeJob(j); }
+  }
+
+  /* spare capacity feeds the spot market */
+  let spotRevenue = 0, spotCost = 0;
+  if (S.overflow && avail.mach > 0 && avail.asm > 0 && avail.test > 0) {
+    const P = PRODUCTS[S.overflow];
+    let rate = Math.min(avail.mach / P.m, avail.asm / P.a, avail.test / P.t);
+    const mc = unitMatCost(S.overflow);
+    if (mc > 0) rate = Math.min(rate, Math.max(0, S.cash) / (mc * dt));
+    if (rate > 0) {
+      const prod = rate * dt;
+      avail.mach -= prod * P.m;
+      avail.asm  -= prod * P.a;
+      avail.test -= prod * P.t;
+      used.mach  += prod * P.m;
+      used.asm   += prod * P.a;
+      used.test  += prod * P.t;
+      spotRevenue = prod * spotPrice(S.overflow);
+      spotCost = prod * mc;
+      S.cash += spotRevenue - spotCost;
+      S.lifetime += spotRevenue;
+      S.units += prod;
+    }
+  }
+
+  /* deadlines */
+  if (!offline) {
+    for (const j of S.jobs.slice()) {
+      j.left -= dt;
+      if (j.left <= 60 && !j.warned60 && j.left > 0) {
+        j.warned60 = true;
+        if (!SILENT) toast(fmtTime(j.left) + ' left on the ' + PRODUCTS[j.p].name.toLowerCase() + ' order.', 'bad');
+      }
+      if (j.left <= 20 && !j.warned20 && j.left > 0) {
+        j.warned20 = true;
+        if (!SILENT) toast('Twenty seconds. ' + j.name + ' is waiting.', 'bad');
+      }
+      if (j.left <= 0) failJob(j);
+    }
+  }
+
+  const net = spotRevenue - spotCost;
+  const lambda = Math.min(0.6, dt / 20);
+  S.flow = S.flow * (1 - lambda) + (net / Math.max(dt, 0.001) * 60) * lambda;
+  if (S.cash < 0) S.cash = 0;
+
+  const denom = { mach: c.mach * dt, asm: c.asm * dt, test: c.test * dt };
+  if (!offline) {
+    for (const k of ['mach', 'asm', 'test']) {
+      const target = clamp(used[k] / Math.max(1e-9, denom[k]), 0, 1.5);
+      UTIL[k] = UTIL[k] * 0.94 + target * 0.06;
+    }
+  }
+}
+
+/* ---------- actions ---------- */
+function buyStation(k) {
+  const cost = stationCost(k);
+  if (S.cash < cost) { toast('Not enough cash for a station (' + money(cost) + ').'); return; }
+  S.cash -= cost;
+  S.stations[k]++;
+  toast('Station installed · ' + STAGES.find(s => s.k === k).name + ' now ' + S.stations[k] + '.', 'good');
+  UI_DIRTY = true;
+}
+function buySpeed(k) {
+  if (S.speed[k] >= SPEED_MAX) { toast('That department is already fully automated.'); return; }
+  const cost = speedCost(k);
+  if (S.cash < cost) { toast('Not enough cash (' + money(cost) + ').'); return; }
+  S.cash -= cost;
+  S.speed[k]++;
+  toast(STAGES.find(s => s.k === k).name + ' speed +10%.', 'good');
+  UI_DIRTY = true;
+}
+function buyTooling() {
+  if (S.tooling >= TOOL_MAX) return;
+  const cost = toolCost();
+  if (S.cash < cost) { toast('Not enough cash (' + money(cost) + ').'); return; }
+  S.cash -= cost; S.tooling++;
+  toast('Precision tooling +5% line speed.', 'good'); UI_DIRTY = true;
+}
+function buyDesk() {
+  if (S.desk >= 3) return;
+  const cost = deskCost();
+  if (S.cash < cost) { toast('Not enough cash (' + money(cost) + ').'); return; }
+  S.cash -= cost; S.desk++;
+  toast('Contract desk expanded · ' + maxSlots() + ' orders at once.', 'good'); UI_DIRTY = true;
+}
+function buySales() {
+  if (S.sales >= SALES_MAX) return;
+  const cost = salesCost();
+  if (S.cash < cost) { toast('Not enough cash (' + money(cost) + ').'); return; }
+  S.cash -= cost; S.sales++;
+  toast('Sales desk · contract prices +6%.', 'good'); UI_DIRTY = true;
+}
+function buySupply() {
+  if (S.supply >= SUPPLY_MAX) return;
+  const cost = supplyCost();
+  if (S.cash < cost) { toast('Not enough cash (' + money(cost) + ').'); return; }
+  S.cash -= cost; S.supply++;
+  toast('Supplier terms · material cost -3%.', 'good'); UI_DIRTY = true;
+}
+function setOverflow(k) {
+  S.overflow = (k === 'off') ? null : k;
+  if (S.overflow) toast('Spare stations will build ' + PRODUCTS[S.overflow].plural + ' for the spot market.');
+  UI_DIRTY = true;
+}
+function bailOut() {
+  if (S.cash >= 250) return;
+  S.cash += 400;
+  S.rep = clamp(S.rep - 4, 0, 100);
+  toast('Scrap bin sold for $400. Reputation -4.', 'bad');
+  UI_DIRTY = true;
+}
+
+/* ---------- milestones ---------- */
+function milestoneProgress(i) {
+  const m = MILESTONES[i];
+  if (S.milestones[i]) return { pct: 1, text: 'Complete' };
+  switch (i) {
+    case 0: return { pct: clamp(S.contracts / 1, 0, 1), text: S.contracts + ' / 1 delivered' };
+    case 1: return { pct: clamp(S.onTime / 4, 0, 1), text: S.onTime + ' / 4 on time' };
+    case 2: {
+      const lo = Math.min(S.stations.mach, S.stations.asm, S.stations.test);
+      return { pct: clamp(lo / 3, 0, 1), text: lo + ' / 3 per department' };
+    }
+    case 3: return { pct: clamp(S.units / 250, 0, 1), text: Math.floor(S.units) + ' / 250 shipped' };
+    case 4: return { pct: clamp(S.regOnTime / 12, 0, 1), text: S.regOnTime + ' / 12 regulators' };
+    case 5: {
+      const prior = S.milestones.slice(0, 5).filter(Boolean).length;
+      const a = clamp(S.lifetime / 60000, 0, 1), b = clamp(S.rep / 75, 0, 1), c = prior / 5;
+      return {
+        pct: Math.min(a, b, c),
+        text: prior < 5 ? prior + ' / 5 marks · ' + moneyShort(S.lifetime) + ' / $60k · rep ' + Math.floor(S.rep) + ' / 75'
+                        : moneyShort(S.lifetime) + ' / $60k · rep ' + Math.floor(S.rep) + ' / 75'
+      };
+    }
+  }
+  return { pct: 0, text: '' };
+}
+function checkMilestones(silent) {
+  MILESTONES.forEach((m, i) => {
+    if (S.milestones[i] || !m.need(S)) return;
+    S.milestones[i] = true;
+    S.cash += m.reward;
+    if (m.rep) S.rep = clamp(S.rep + m.rep, 0, 100);
+    if (!silent && !SILENT) toast('Charter mark — ' + m.name + ' · +' + money(m.reward) + (m.rep ? ' · +' + m.rep + ' rep' : ''), 'good');
+    if (m.win && !S.won) {
+      S.won = true;
+      if (!silent && !SILENT && typeof showWin === 'function') showWin();
+    }
+    UI_DIRTY = true;
+  });
+}
+
+/* ---------- offline ---------- */
+function applyOffline(seconds) {
+  const capped = Math.max(0, Math.min(seconds, OFFLINE_CAP));
+  if (capped < 20) {
+    SILENT = true; simulate(capped, true); SILENT = false;
+    return null;
+  }
+  const before = { cash: S.cash, lifetime: S.lifetime, units: S.units, contracts: S.contracts };
+  SILENT = true;
+  let step = 2;
+  for (let e = 0; e < capped; e += step) simulate(Math.min(step, capped - e), true);
+  SILENT = false;
+  return {
+    seconds: capped,
+    skipped: seconds > OFFLINE_CAP,
+    cash: S.cash - before.cash,
+    revenue: S.lifetime - before.lifetime,
+    units: S.units - before.units,
+    contracts: S.contracts - before.contracts
+  };
+}
+/* ============================================================
+   UI
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const elOffers = $('offers'), elJobs = $('jobs'), elStages = $('stages'), elOffice = $('office');
+const elGoals = $('goals'), elOverflow = $('overflowBtns'), elToasts = $('toasts');
+
+const ICONS = {
+  mach: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8.2" opacity=".55"/><path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3M4.8 4.8l2.1 2.1M17.1 17.1l2.1 2.1M19.2 4.8l-2.1 2.1M6.9 17.1l-2.1 2.1"/></svg>',
+  asm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M14.7 6.3a3.6 3.6 0 0 0 4.6 4.6l-9.2 9.2a2.2 2.2 0 0 1-3.1-3.1l9.2-9.2z"/><path d="M16.5 2.6l4.9 4.9-2.1 2.1-4.9-4.9z" opacity=".6"/></svg>',
+  test: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4 18a8 8 0 0 1 16 0"/><path d="M12 18l4.2-5.2"/><circle cx="12" cy="18" r="1.4"/><path d="M3 21h18" opacity=".5"/></svg>',
+  tooling: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 8h9M3 16h7M17 5v9M17 19v.5"/><rect x="12" y="6" width="10" height="6" rx="1"/></svg>',
+  desk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/></svg>',
+  sales: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 12l4-7h10l4 7-9 8z"/><circle cx="12" cy="11" r="2"/></svg>',
+  supply: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 7h11v10H3zM14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.2l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1-5.3 3.1 1.3-6L3.4 9.4l6.1-.6z"/></svg>',
+  starO: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3.2l2.5 5.6 6.1.6-4.6 4.1 1.3 6-5.3-3.1-5.3 3.1 1.3-6L3.4 9.4l6.1-.6z"/></svg>',
+  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+};
+
+let RUNNING = false;
+let MODAL_PAUSE = false;
+let ARMED = null;
+let LAST_UI = 0;
+let HIDDEN_AT = 0;
+const SIG = { offers: '', jobs: '', goals: '', unlock: '' };
+const LAST_PIPS = { mach: -1, asm: -1, test: -1 };
+
+/* ---------- toasts ---------- */
+function toast(msg, kind) {
+  if (SILENT) return;
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' ' + kind : '');
+  const dot = document.createElement('span'); dot.className = 'dot';
+  t.appendChild(dot);
+  t.appendChild(document.createTextNode(msg));
+  elToasts.prepend(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, 4300);
+  while (elToasts.children.length > 3) elToasts.lastChild.remove();
+}
+
+/* ---------- modal ---------- */
+function openModal(id) {
+  if (RUNNING) { MODAL_PAUSE = true; RUNNING = false; }
+  document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
+  const m = $(id);
+  if (!m) return;
+  m.classList.add('open');
+  const b = m.querySelector('.btn.primary');
+  if (b) setTimeout(() => b.focus({ preventScroll: true }), 40);
+}
+function closeAll() {
+  document.querySelectorAll('.modal.open').forEach(m => {
+    if (m.id !== 'mIntro') m.classList.remove('open');
+  });
+  if (MODAL_PAUSE) { MODAL_PAUSE = false; RUNNING = true; lastFrameAt = performance.now(); }
+}
+function showWin() {
+  const c = $('winStats');
+  c.innerHTML = [
+    ['Lifetime revenue', money(S.lifetime), true],
+    ['Units shipped', Math.floor(S.units).toLocaleString('en-US'), false],
+    ['Contracts honoured', S.contracts, false],
+    ['On-time record', S.onTime + ' / ' + Math.max(1, S.onTime + S.failed), false],
+    ['Reputation', Math.round(S.rep) + ' / 100', false],
+    ['Days at the works', shiftClock().day, false]
+  ].map(([k, v, hi]) => '<div><dt>' + k + '</dt><dd class="' + (hi ? 'hi' : '') + '">' + v + '</dd></div>').join('');
+  openModal('mWin');
+}
+function showOffline(res, away) {
+  const hrs = Math.floor(away / 3600), mins = Math.floor((away % 3600) / 60);
+  $('offlineStats').innerHTML = [
+    ['Away for', (hrs ? hrs + 'h ' : '') + mins + 'm', false],
+    ['Units shipped', Math.floor(res.units).toLocaleString('en-US'), false],
+    ['Revenue booked', money(res.revenue), true],
+    ['Contracts delivered', res.contracts, false],
+    ['Cash change', (res.cash >= 0 ? '+' : '') + money(res.cash), true],
+    ['Clocked at', shiftClock().time, false]
+  ].map(([k, v, hi]) => '<div><dt>' + k + '</dt><dd class="' + (hi ? 'hi' : '') + '">' + v + '</dd></div>').join('');
+  $('offlineFine').textContent = res.skipped
+    ? 'The night shift runs at 35% pace and is capped at four hours; the rest of your absence was unpaid. Contract clocks were paused.'
+    : 'Contract clocks were paused while you were gone. The night shift runs at 35% pace and stops after four hours.';
+  openModal('mOffline');
+}
+
+/* ---------- static builders ---------- */
+function buildStages() {
+  elStages.innerHTML = STAGES.map(s => `
+    <div class="stage" data-stage="${s.k}">
+      <div class="st-head">
+        <span class="st-ico">${ICONS[s.k]}</span>
+        <div><h3>${s.name}</h3><p>${s.sub}</p></div>
+        <span class="badge">Constraint</span>
+      </div>
+      <div class="st-meta"><b data-stations>—</b><span>stations</span><em><span data-speed>×1.00</span> · <span data-utilpct>0%</span></em></div>
+      <div class="pips" data-pips></div>
+      <div class="bar"><i data-bar></i></div>
+      <div class="st-act">
+        <button class="btn ghost sm" type="button" data-act="station" data-k="${s.k}">+ Station <b data-costs></b></button>
+        <button class="btn ghost sm" type="button" data-act="speed" data-k="${s.k}">+10% speed <b data-costsp></b></button>
+      </div>
+    </div>`).join('');
+}
+
+const OFFICE = [
+  { act: 'tooling', icon: 'tooling', name: 'Precision tooling', desc: '+5% speed in every department', max: TOOL_MAX, lvl: () => S.tooling, cost: toolCost },
+  { act: 'desk', icon: 'desk', name: 'Contract desk', desc: '+1 order committed at once', max: 3, lvl: () => S.desk, cost: deskCost },
+  { act: 'sales', icon: 'sales', name: 'Sales desk', desc: '+6% contract prices; more enquiries at Lv 2', max: SALES_MAX, lvl: () => S.sales, cost: salesCost },
+  { act: 'supply', icon: 'supply', name: 'Supplier terms', desc: '-3% material cost on every order', max: SUPPLY_MAX, lvl: () => S.supply, cost: supplyCost }
+];
+
+function buildOffice() {
+  elOffice.innerHTML = OFFICE.map(u => `
+    <div class="upg" data-upg="${u.act}">
+      <span class="ui">${ICONS[u.icon]}</span>
+      <div class="upg-txt"><b>${u.name}</b><span>${u.desc} · <em data-lvl>Lv 0</em></span></div>
+      <button class="btn ghost sm" type="button" data-act="${u.act}"><span data-buy>Buy</span> <b data-cost>—</b></button>
+    </div>`).join('');
+}
+
+function renderOverflow() {
+  const defs = [['gate', 'Gate'], ['ball', 'Ball'], ['reg', 'Reg'], ['off', 'Idle']];
+  elOverflow.innerHTML = defs.map(([k, label]) => {
+    const locked = k !== 'off' && !unlockedProducts().includes(k);
+    const on = (k === 'off' && !S.overflow) || S.overflow === k;
+    const price = k === 'off' ? '—' : '$' + Math.round(spotPrice(k));
+    return `<button type="button" data-act="overflow" data-k="${k}" class="${on ? 'on' : ''}" ${locked ? 'disabled' : ''}
+      title="${locked ? 'Unlocks at reputation ' + (k === 'ball' ? 55 : 70) : 'Set the spare line to ' + label.toLowerCase()}">
+      ${label}<b data-spot="${k}">${locked ? 'locked' : price}</b></button>`;
+  }).join('');
+}
+
+function renderGoals() {
+  elGoals.innerHTML = MILESTONES.map((m, i) => {
+    const p = milestoneProgress(i);
+    const done = S.milestones[i];
+    return `<article class="goal ${done ? 'done' : ''}" data-goal="${i}">
+      <span class="no">0${i + 1}</span>
+      <h4>${m.name}</h4>
+      <p>${m.desc}</p>
+      <div class="prog"><i data-gbar style="width:${Math.round(p.pct * 100)}%"></i></div>
+      <div class="rw"><span data-gtext>${p.text}</span><b>${done ? 'paid' : '+' + money(m.reward)}</b></div>
+    </article>`;
+  }).join('');
+}
+
+/* ---------- dynamic render ---------- */
+function offerEstimate(o) {
+  const rate = rateOf(o.p);
+  const solo = o.qty / Math.max(0.001, rate);
+  const ratio = solo / o.deadline;
+  let cls = '', label = '';
+  if (ratio > 0.92) { cls = 'tight'; label = 'tight — needs the whole floor'; }
+  else if (ratio > 0.72) { cls = ''; label = 'workable'; }
+  else { cls = 'comfy'; label = 'comfortable'; }
+  const squeeze = S.jobs.length >= maxSlots() ? ' · no free line' : '';
+  return '<span class="dot"></span>≈ ' + fmtTime(solo) + ' alone · ' + fmtTime(o.deadline) + ' deadline — ' + label + squeeze;
+}
+
+function renderOffers() {
+  if (!S.offers.length) {
+    elOffers.innerHTML = '<div class="empty">No enquiries on the board. The next one is already on its way — or keep the spare line on the spot market.</div>';
+    return;
+  }
+  elOffers.innerHTML = S.offers.map(o => {
+    const P = PRODUCTS[o.p];
+    const est = offerEstimate(o);
+    const estCls = est.indexOf('tight') > -1 ? 'tight' : (est.indexOf('comfortable') > -1 ? 'comfy' : '');
+    return `<article class="offer ${o.rush ? 'rush' : ''}">
+      <div class="offer-top">
+        <span class="tag ${o.p}">${P.code}</span>
+        ${o.rush ? '<span class="tag rush">RUSH</span>' : ''}
+        <span class="cust">${o.name}</span>
+        <span class="ttl" data-ttl="${o.id}">exp ${fmtTime(o.ttl)}</span>
+      </div>
+      <div class="offer-mid">
+        <div class="big">${o.qty}<span>${P.plural}</span></div>
+        <div class="price">$${o.price}<span>per unit</span></div>
+      </div>
+      <dl class="facts">
+        <div><dt>Order</dt><dd>${money(o.value)}</dd></div>
+        <div><dt>Materials</dt><dd>${money(o.matCost)}</dd></div>
+        <div><dt>Net</dt><dd class="ok">${money(o.net)}</dd></div>
+        <div><dt>Window</dt><dd>${fmtTime(o.deadline)}</dd></div>
+      </dl>
+      <div class="estimate ${estCls}" data-est="${o.id}">${est}</div>
+      <button class="btn primary" type="button" data-act="accept" data-id="${o.id}">Accept order</button>
+    </article>`;
+  }).join('');
+}
+
+function renderJobs() {
+  document.body.classList.toggle('has-jobs', S.jobs.length > 0);
+  if (!S.jobs.length) {
+    elJobs.innerHTML = '<div class="empty">Nothing committed. Every station is on the spot market or standing idle.</div>';
+    return;
+  }
+  elJobs.innerHTML = S.jobs.map(j => {
+    const P = PRODUCTS[j.p];
+    const pct = clamp(j.units / j.qty, 0, 1) * 100;
+    return `<article class="job ${j.focus ? 'focused' : ''}" data-job="${j.id}">
+      <div class="job-top">
+        <span class="tag ${j.p}">${P.code}</span>
+        <span class="job-name">${j.name}</span>
+        <span class="job-tools">
+          <button class="iconbtn ${j.focus ? 'on' : ''}" type="button" data-act="focus" data-id="${j.id}"
+            title="${j.focus ? 'Release priority' : 'Prioritise this order'}" aria-label="${j.focus ? 'Release priority' : 'Prioritise this order'}" aria-pressed="${j.focus}">${j.focus ? ICONS.star : ICONS.starO}</button>
+          <button class="iconbtn" type="button" data-act="abandon" data-id="${j.id}" title="Release this order to the client" aria-label="Release this order to the client">${ICONS.close}</button>
+        </span>
+      </div>
+      <div class="track"><i data-jbar></i></div>
+      <div class="job-nums"><span><b data-junits>0</b> / ${j.qty}</span><span class="due" data-jdue>—</span></div>
+      <div class="job-foot">
+        <span class="proj" data-jproj>projecting…</span>
+        <span>${j.focus ? '<span class="pill">priority</span> · ' : ''}${money(j.value)}</span>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+function foremanHTML() {
+  if (S.jobs.length) {
+    const soon = S.jobs.slice().sort((a, b) => a.left - b.left)[0];
+    if (soon.left < 45) return '<b>' + soon.name + '</b> is nearly out of time. Prioritise it with the star, or let it go and protect your reputation elsewhere.';
+    const p = soon.p;
+    const bn = bottleneckOf(p);
+    const name = STAGES.find(s => s.k === bn).name;
+    return 'Your ' + PRODUCTS[p].name.toLowerCase() + ' order is limited by <b>' + name.toLowerCase() + '</b>. A station there lifts every order, not just this one.';
+  }
+  if (S.cash < 250) return 'Cash is nearly gone. Sell the scrap bin for $400 and a little reputation, then take the safest order on the board. <button class="btn tiny ghost" type="button" data-act="bailout" style="margin-left:4px">Scrap bin +$400 · −4 rep</button>';
+  if (S.rep < 55) return 'Deliver on time and <b>reputation 55</b> will bring ball valve clients through the door. They pay better.';
+  if (S.overflow) return 'No orders committed, so spare stations are building <b>' + PRODUCTS[S.overflow].plural + '</b> for the spot market. It pays the wages, not much more.';
+  return 'The floor is idle. Take an order, or switch the spare line back to the spot market.';
+}
+
+function updateSaveState() {
+  const el = $('saveState');
+  if (!el) return;
+  el.textContent = 'Autosaved ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+/* ---------- live updates ---------- */
+function updateStages() {
+  const focusP = (S.jobs.find(j => j.focus) || S.jobs.slice().sort((a, b) => a.left - b.left)[0] || { p: S.overflow || 'gate' }).p;
+  const bn = bottleneckOf(focusP);
+  let topUtil = 0;
+  STAGES.forEach(s => {
+    const box = elStages.querySelector('[data-stage="' + s.k + '"]');
+    if (!box) return;
+    box.querySelector('[data-stations]').textContent = S.stations[s.k];
+    box.querySelector('[data-speed]').textContent = '×' + speedMult(s.k).toFixed(2);
+    const count = S.stations[s.k];
+    if (LAST_PIPS[s.k] !== count) {
+      const n = Math.min(count, 12);
+      let html = '';
+      for (let i = 0; i < n; i++) html += '<i class="on"></i>';
+      if (count > 12) html += '<i class="more">+' + (count - 12) + '</i>';
+      box.querySelector('[data-pips]').innerHTML = html;
+      LAST_PIPS[s.k] = count;
+    }
+    const u = clamp(UTIL[s.k], 0, 1);
+    topUtil = Math.max(topUtil, u);
+    box.querySelector('[data-bar]').style.width = (u * 100).toFixed(0) + '%';
+    const up = box.querySelector('[data-utilpct]');
+    up.textContent = Math.round(u * 100) + '%';
+    up.style.color = u > 0.82 ? 'var(--brass2)' : 'var(--faint)';
+    box.classList.toggle('on', bn === s.k);
+    const badge = box.querySelector('.badge');
+    badge.title = 'Limits your ' + (PRODUCTS[focusP] ? PRODUCTS[focusP].name.toLowerCase() : 'order') + ' orders';
+    const bc = box.querySelector('[data-costs]');
+    bc.textContent = money(stationCost(s.k));
+    const sc = box.querySelector('[data-costsp]');
+    sc.textContent = S.speed[s.k] >= SPEED_MAX ? 'MAX' : money(speedCost(s.k));
+    box.querySelector('[data-act="station"]').disabled = S.cash < stationCost(s.k);
+    const sb = box.querySelector('[data-act="speed"]');
+    sb.disabled = S.speed[s.k] >= SPEED_MAX || S.cash < speedCost(s.k);
+  });
+  $('utilTop').textContent = Math.round(topUtil * 100) + '%';
+  $('rateGate').textContent = (rateOf('gate') * 60).toFixed(1);
+  $('rateBall').textContent = (rateOf('ball') * 60).toFixed(1);
+  $('rateReg').textContent = (rateOf('reg') * 60).toFixed(1);
+}
+
+function updateOffice() {
+  OFFICE.forEach(u => {
+    const row = elOffice.querySelector('[data-upg="' + u.act + '"]');
+    if (!row) return;
+    const lvl = u.lvl();
+    const maxed = lvl >= u.max;
+    row.classList.toggle('locked', maxed);
+    row.querySelector('[data-lvl]').textContent = maxed ? 'Lv ' + lvl + ' · max' : 'Lv ' + lvl;
+    const btn = row.querySelector('button');
+    btn.disabled = maxed || S.cash < u.cost();
+    row.querySelector('[data-buy]').textContent = maxed ? 'Maxed' : 'Buy';
+    const costEl = row.querySelector('[data-cost]');
+    costEl.textContent = maxed ? '·' : money(u.cost());
+    costEl.style.display = maxed ? 'none' : '';
+  });
+}
+
+function updateLive() {
+  if (!S) return;
+  const c = shiftClock();
+  $('sCash').textContent = money(S.cash);
+  $('sRep').textContent = Math.round(S.rep);
+  $('repFill').style.width = clamp(S.rep, 0, 100) + '%';
+  $('sSlots').textContent = S.jobs.length + ' / ' + maxSlots();
+  const flow = S.flow;
+  $('sFlow').textContent = (flow < -0.5 ? '-' : '') + money(Math.abs(flow));
+  $('sFlow').classList.toggle('neg', flow < -0.5);
+  $('sDay').textContent = 'Day ' + c.day;
+  $('sTime').textContent = c.time;
+  $('jobSlots').textContent = S.jobs.length + ' / ' + maxSlots() + ' committed';
+  $('lifeRev').textContent = money(S.lifetime);
+  $('boardTimer').textContent = S.offers.length >= maxOffers()
+    ? S.offers.length + ' / ' + maxOffers()
+    : 'next ' + fmtTime(S.offerIn);
+
+  updateStages();
+  updateOffice();
+
+  /* offer buttons + expiry */
+  const slotsFull = S.jobs.length >= maxSlots();
+  S.offers.forEach(o => {
+    const ttl = elOffers.querySelector('[data-ttl="' + o.id + '"]');
+    if (ttl) {
+      ttl.textContent = 'exp ' + fmtTime(o.ttl);
+      ttl.style.color = o.ttl < 12 ? 'var(--warn)' : '';
+    }
+    const b = elOffers.querySelector('[data-act="accept"][data-id="' + o.id + '"]');
+    if (b) {
+      b.disabled = slotsFull || S.cash < o.matCost;
+      b.title = slotsFull ? 'Every line is committed' : (S.cash < o.matCost ? 'Not enough cash for materials' : 'Accept and pay materials now');
+    }
+  });
+
+  /* jobs live */
+  const proj = projectJobs();
+  S.jobs.forEach(j => {
+    const card = elJobs.querySelector('[data-job="' + j.id + '"]');
+    if (!card) return;
+    const pct = clamp(j.units / j.qty, 0, 1) * 100;
+    card.querySelector('[data-jbar]').style.width = pct.toFixed(2) + '%';
+    card.querySelector('[data-junits]').textContent = Math.floor(j.units);
+    const due = card.querySelector('[data-jdue]');
+    due.textContent = 'due ' + fmtTime(j.left);
+    due.classList.toggle('hot', j.left < 45);
+    card.classList.toggle('urgent', j.left < 45);
+    const pr = proj[j.id];
+    const pe = card.querySelector('[data-jproj]');
+    if (pr && pe) {
+      const late = pr.slack < 0;
+      pe.textContent = late ? 'projected ' + fmtTime(-pr.slack) + ' late' : 'projected ' + fmtTime(pr.slack) + ' spare';
+      pe.className = 'proj ' + (late ? 'late' : 'ok');
+      pe.title = 'Queue projection: finishes in about ' + fmtTime(pr.finishIn) + ', against ' + fmtTime(j.left) + ' left.';
+    }
+  });
+
+  /* spot prices */
+  elOverflow.querySelectorAll('[data-spot]').forEach(b => {
+    const k = b.dataset.spot;
+    if (k !== 'off' && unlockedProducts().includes(k)) b.textContent = '$' + Math.round(spotPrice(k));
+  });
+
+  /* goals live text */
+  MILESTONES.forEach((m, i) => {
+    const p = milestoneProgress(i);
+    const card = elGoals.querySelector('[data-goal="' + i + '"]');
+    if (!card) return;
+    card.querySelector('[data-gtext]').textContent = p.text;
+    card.querySelector('[data-gbar]').style.width = Math.round(p.pct * 100) + '%';
+  });
+
+  $('tabOrders').textContent = S.offers.length;
+  $('tabGoals').textContent = S.milestones.filter(x => !x).length;
+
+  const fm = $('foreman');
+  const html = foremanHTML();
+  if (fm.dataset.last !== html) { fm.innerHTML = html; fm.dataset.last = html; }
+}
+
+function maybeRender() {
+  if (!S) return;
+  const offerSig = S.offers.map(o => o.id).join(',') + '|' + maxSlots() + '|' + S.jobs.length;
+  if (offerSig !== SIG.offers) { renderOffers(); SIG.offers = offerSig; }
+  const jobSig = S.jobs.map(j => j.id + (j.focus ? '*' : '')).join(',') + '|' + maxSlots();
+  if (jobSig !== SIG.jobs) { renderJobs(); SIG.jobs = jobSig; }
+  const goalSig = S.milestones.join('');
+  if (goalSig !== SIG.goals) { renderGoals(); SIG.goals = goalSig; }
+  const unlockSig = unlockedProducts().join(',') + '|' + (S.overflow || 'off');
+  if (unlockSig !== SIG.unlock) { renderOverflow(); SIG.unlock = unlockSig; }
+  UI_DIRTY = false;
+}
+
+function renderAll() {
+  renderOffers(); renderJobs(); renderGoals(); renderOverflow(); updateLive();
+  SIG.offers = S.offers.map(o => o.id).join(',') + '|' + maxSlots() + '|' + S.jobs.length;
+  SIG.jobs = S.jobs.map(j => j.id + (j.focus ? '*' : '')).join(',') + '|' + maxSlots();
+  SIG.goals = S.milestones.join('');
+  SIG.unlock = unlockedProducts().join(',') + '|' + (S.overflow || 'off');
+}
+
+/* ---------- actions ---------- */
+function doAction(act, btn) {
+  const id = +btn.dataset.id;
+  const k = btn.dataset.k;
+  switch (act) {
+    case 'start':
+      S.introSeen = true;
+      MODAL_PAUSE = false;
+      RUNNING = true;
+      lastFrameAt = performance.now();
+      saveGame();
+      $('mIntro').classList.remove('open');
+      toast('The gates are open. Take your first order.', 'good');
+      break;
+    case 'closeModal': closeAll(); break;
+    case 'help': openModal('mHelp'); break;
+    case 'resetAsk': openModal('mReset'); break;
+    case 'resetConfirm': hardReset(); $('mReset').classList.remove('open'); toast('Fresh books, same building.', 'good'); break;
+    case 'accept': acceptOffer(id); break;
+    case 'focus': setFocus(id); break;
+    case 'abandon': {
+      const j = S.jobs.find(x => x.id === id);
+      if (!j) return;
+      if (ARMED && ARMED.id === id && Date.now() < ARMED.until) {
+        ARMED = null;
+        abandonJob(id);
+      } else {
+        ARMED = { id, until: Date.now() + 4000 };
+        toast('Release ' + j.name + '? This forfeits the order and costs 8 reputation. Click × again to confirm.', 'bad');
+        const card = elJobs.querySelector('[data-job="' + id + '"]');
+        if (card) { const b = card.querySelector('[data-act="abandon"]'); if (b) { b.style.color = 'var(--bad)'; b.style.borderColor = 'rgba(213,122,112,.6)'; } }
+        setTimeout(() => { if (ARMED && ARMED.id === id && Date.now() >= ARMED.until) ARMED = null; }, 4100);
+      }
+      break;
+    }
+    case 'station': buyStation(k); break;
+    case 'speed': buySpeed(k); break;
+    case 'tooling': buyTooling(); break;
+    case 'desk': buyDesk(); break;
+    case 'sales': buySales(); break;
+    case 'supply': buySupply(); break;
+    case 'overflow': setOverflow(k); break;
+    case 'bailout': bailOut(); break;
+  }
+}
+
+function bindEvents() {
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (b) { doAction(b.dataset.act, b); return; }
+    const tab = e.target.closest('.tabs button');
+    if (tab) {
+      document.body.dataset.view = tab.dataset.view;
+      document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === tab));
+      return;
+    }
+    if (e.target.classList.contains('modal')) {
+      if (e.target.id !== 'mIntro') closeAll();
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      const open = document.querySelector('.modal.open');
+      if (open && open.id !== 'mIntro') closeAll();
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      HIDDEN_AT = Date.now();
+      saveGame();
+    } else if (HIDDEN_AT) {
+      const away = (Date.now() - HIDDEN_AT) / 1000;
+      HIDDEN_AT = 0;
+      lastFrameAt = performance.now();
+      if (away > 45 && RUNNING) {
+        const res = applyOffline(away);
+        if (res && (res.units > 1 || res.contracts > 0)) showOffline(res, away);
+        renderAll();
+        saveGame();
+      }
+    }
+  });
+  window.addEventListener('beforeunload', saveGame);
+}
+
+/* ---------- reset ---------- */
+function hardReset() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  S = freshState();
+  S.introSeen = true;
+  refillOffers(true);
+  S.offerIn = 6;
+  RUNNING = true;
+  MODAL_PAUSE = false;
+  ARMED = null;
+  UTIL.mach = UTIL.asm = UTIL.test = 0;
+  LAST_PIPS.mach = LAST_PIPS.asm = LAST_PIPS.test = -1;
+  document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
+  renderAll();
+  saveGame();
+}
+
+/* ---------- loop ---------- */
+function frame(now) {
+  const raw = (now - lastFrameAt) / 1000;
+  lastFrameAt = now;
+  if (RUNNING) {
+    const dt = clamp(raw, 0, 0.5);
+    if (dt > 0) {
+      simulate(dt, false);
+      tickOffers(dt);
+      checkMilestones(false);
+    }
+  }
+  if (now - LAST_UI > 140) { updateLive(); maybeRender(); LAST_UI = now; }
+  requestAnimationFrame(frame);
+}
+
+/* ---------- test surface ---------- */
+function advance(seconds, step) {
+  step = step || 1;
+  let t = 0;
+  while (t < seconds - 1e-9) {
+    const d = Math.min(step, seconds - t);
+    simulate(d, false);
+    tickOffers(d);
+    t += d;
+  }
+  checkMilestones(false);
+  updateLive(); maybeRender();
+}
+
+/* ---------- boot ---------- */
+function init() {
+  buildStages();
+  const loaded = loadGame();
+  S = loaded || freshState();
+  buildOffice();
+  bindEvents();
+
+  if (!loaded) {
+    refillOffers(true);
+    S.offerIn = 6;
+  } else if (!S.offers.length) {
+    refillOffers(true);
+  }
+
+  renderAll();
+
+  let offline = null, away = 0;
+  if (loaded) {
+    away = (Date.now() - S.savedAt) / 1000;
+    if (away > 45) {
+      offline = applyOffline(away);
+      renderAll();
+    }
+  }
+
+  RUNNING = S.introSeen;
+  if (!S.introSeen) openModal('mIntro');
+  if (offline && (offline.units > 1 || offline.contracts > 0)) showOffline(offline, away);
+
+  lastFrameAt = performance.now();
+  LAST_UI = 0;
+  saveGame();
+  updateSaveState();
+  setInterval(saveGame, 8000);
+  requestAnimationFrame(frame);
+}
+
+window.__vf = {
+  get state() { return S; },
+  set state(v) { S = v; },
+  simulate, tickOffers, advance, genOffer, refillOffers, acceptOffer, setFocus, abandonJob, failJob,
+  buyStation, buySpeed, buyTooling, buyDesk, buySales, buySupply, setOverflow, bailOut,
+  applyOffline, saveGame, loadGame, hardReset, checkMilestones, milestoneProgress,
+  rateOf, cap, bottleneckOf, market, spotPrice, unitMatCost, speedMult,
+  projectJobs, jobOrder,
+  maxSlots, maxOffers, stationCost, speedCost, toolCost, deskCost, salesCost, supplyCost,
+  updateLive, maybeRender, renderAll, openModal, closeAll, recenter: renderAll,
+  pause() { RUNNING = false; }, play() { RUNNING = true; },
+  fmtTime, money, shiftClock, PRODUCTS, STAGES, MILESTONES, SAVE_KEY, OFFLINE_CAP,
+  get running() { return RUNNING; },
+  get util() { return UTIL; }
+};
+
+init();
+</script>
+</body>
+</html>
