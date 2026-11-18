@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Silk — draw light, watch it fall</title>
+<meta name="description" content="Drag to draw glowing silk ribbons that flow, sway and fall. A calm, tactile toy for your eyes.">
+<style>
+  :root{ --bg:#070b14; --ink:#e8eef9; --dim:#6b7a93; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  canvas{position:fixed;inset:0;display:block;touch-action:none}
+  header{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;
+    padding:16px 20px;z-index:2;pointer-events:none}
+  header b{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:#9fb2cf;font-weight:600}
+  header span{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+  #hint{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);z-index:2;font-size:13px;
+    color:#8fa3c0;background:rgba(7,11,20,.6);border:1px solid rgba(255,255,255,.07);
+    padding:9px 18px;border-radius:999px;backdrop-filter:blur(10px);transition:opacity .8s;pointer-events:none;white-space:nowrap}
+  #hint.off{opacity:0}
+  #clear{position:fixed;right:18px;bottom:18px;z-index:2;font:inherit;font-size:12px;color:#8fa3c0;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:999px;
+    padding:9px 16px;cursor:pointer;backdrop-filter:blur(8px)}
+  #clear:hover{color:#e8eef9;border-color:rgba(255,255,255,.2)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<header><b>Silk</b><span id="count">0 strands</span></header>
+<div id="hint">Drag to draw light — let go and watch it fall</div>
+<button id="clear">clear</button>
+<script>
+(() => {
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const countEl = document.getElementById('count'), hint = document.getElementById('hint');
+  let W = 0, H = 0, dpr = Math.min(devicePixelRatio || 1, 2);
+  let strands = [], drawing = false, hue = 190, raf = 0, t0 = performance.now();
+
+  const PALETTE = [192, 168, 268, 320, 42, 210];
+
+  function resize() {
+    W = innerWidth; H = innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  addEventListener('resize', resize);
+
+  const SEG = 7;            // rest length between points
+  const MAX_PTS = 90;
+
+  function newStrand(x, y) {
+    const h = PALETTE[strands.length % PALETTE.length];
+    return { pts: [{ x, y }], hue: h, life: 1, phase: Math.random() * 6.28, seed: Math.random() * 100 };
+  }
+
+  function pointer(e) {
+    const p = e.touches ? e.touches[0] : e;
+    return { x: p.clientX, y: p.clientY };
+  }
+
+  function start(e) {
+    e.preventDefault();
+    drawing = true;
+    const p = pointer(e);
+    const s = newStrand(p.x, p.y);
+    // seed a short tail so the ribbon has shape immediately
+    for (let i = 1; i <= 6; i++) s.pts.unshift({ x: p.x + i * 2, y: p.y + i * 2 });
+    strands.push(s);
+    if (strands.length > 14) strands.shift();
+    paintCount();
+    hint.classList.add('off');
+  }
+  function move(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = pointer(e), s = strands[strands.length - 1];
+    if (!s) return;
+    const head = s.pts[0];
+    const dx = p.x - head.x, dy = p.y - head.y;
+    if (dx * dx + dy * dy > 9) {
+      s.pts.unshift({ x: p.x, y: p.y });
+      if (s.pts.length > MAX_PTS) s.pts.pop();
+    }
+  }
+  function end() { drawing = false; }
+
+  cv.addEventListener('mousedown', start);
+  addEventListener('mousemove', move);
+  addEventListener('mouseup', end);
+  cv.addEventListener('touchstart', start, { passive: false });
+  addEventListener('touchmove', move, { passive: false });
+  addEventListener('touchend', end);
+
+  document.getElementById('clear').addEventListener('click', () => { strands = []; paintCount(); });
+
+  function paintCount() {
+    countEl.textContent = strands.length + (strands.length === 1 ? ' strand' : ' strands');
+  }
+
+  // physics: verlet integration along the rope, gentle gravity, air sway
+  function step(dt) {
+    const now = performance.now();
+    strands.forEach((s, si) => {
+      const pts = s.pts;
+      for (let i = 1; i < pts.length; i++) {
+        const p = pts[i], prev = pts[i - 1];
+        // integrate
+        let vx = (p.x - (p.px ?? p.x)) * 0.86;
+        let vy = (p.y - (p.py ?? p.y)) * 0.86;
+        p.px = p.x; p.py = p.y;
+        p.x += vx + Math.sin((now / 1600) + i * 0.22 + s.phase) * 0.28;
+        p.y += vy + 0.42;
+
+        // constrain to previous point (rest length SEG)
+        const dx = p.x - prev.x, dy = p.y - prev.y;
+        const d = Math.hypot(dx, dy) || 0.001;
+        const diff = (d - SEG) / d;
+        p.x -= dx * diff;
+        p.y -= dy * diff;
+      }
+      pts[0].px = pts[0].x; pts[0].py = pts[0].y;
+
+      if (!drawing || si !== strands.length - 1) s.life -= 0.0016;
+    });
+    strands = strands.filter(s => s.life > 0 && s.pts.length > 1);
+  }
+
+  function render(now) {
+    // fade previous frame instead of clearing -> soft motion trails
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(7,11,20,0.18)';
+    ctx.fillRect(0, 0, W, H);
+
+    // additive, cheap glow: three width passes per strand (no shadowBlur — it kills perf)
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    strands.forEach(s => {
+      const pts = s.pts, n = pts.length;
+      if (n < 2) return;
+      const life = Math.max(0, Math.min(1, s.life));
+      const l = 66 + Math.sin(now / 900 + s.phase) * 8;
+
+      const passes = [
+        { w: 26, a: 0.05 },
+        { w: 13, a: 0.10 },
+        { w: 5.5, a: 0.26 },
+        { w: 1.9, a: 0.55 }
+      ];
+      for (const pass of passes) {
+        ctx.strokeStyle = `hsla(${s.hue}, 92%, ${l}%, ${pass.a * life})`;
+        ctx.lineWidth = pass.w;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < n; i++) {
+          const p = pts[i], q = pts[i - 1];
+          // quadratic midpoint smoothing
+          ctx.quadraticCurveTo(q.x, q.y, (q.x + p.x) / 2, (q.y + p.y) / 2);
+        }
+        ctx.stroke();
+      }
+    });
+
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function loop(now) {
+    step(now);
+    render(now);
+    raf = requestAnimationFrame(loop);
+  }
+  loop();
+
+  setTimeout(() => hint.classList.add('off'), 9000);
+})();
+</script>
+</body>
+</html>

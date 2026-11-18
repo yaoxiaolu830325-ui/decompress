@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Sand — pour a little calm</title>
+<meta name="description" content="Pour colored sand with your finger. It piles, slides and settles. A tiny sandbox with no goals.">
+<style>
+  :root{ --bg:#0a0f1a; --ink:#e9eef8; --dim:#66748c; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  canvas{position:fixed;inset:0;display:block;touch-action:none;image-rendering:pixelated}
+  header{position:fixed;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;
+    padding:16px 20px;z-index:2;pointer-events:none}
+  header b{font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:#9fb2cf;font-weight:600}
+  #hint{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:2;font-size:13px;color:#8fa3c0;
+    background:rgba(10,15,26,.62);border:1px solid rgba(255,255,255,.07);padding:9px 18px;border-radius:999px;
+    backdrop-filter:blur(10px);transition:opacity .8s;pointer-events:none;white-space:nowrap}
+  #hint.off{opacity:0}
+  #bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2;display:flex;gap:10px;
+    align-items:center;background:rgba(10,15,26,.72);border:1px solid rgba(255,255,255,.08);
+    padding:10px 14px;border-radius:999px;backdrop-filter:blur(12px)}
+  .sw{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;
+    transition:transform .18s,border-color .18s;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset}
+  .sw:hover{transform:translateY(-2px) scale(1.06)}
+  .sw.on{border-color:#e9eef8}
+  #bar button{font:inherit;font-size:12px;color:#8fa3c0;background:transparent;border:0;
+    border-left:1px solid rgba(255,255,255,.1);padding-left:12px;margin-left:4px;cursor:pointer}
+  #bar button:hover{color:#e9eef8}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<header><b>Sand</b><span id="info"></span></header>
+<div id="hint">Drag to pour sand</div>
+<div id="bar"></div>
+<script>
+(() => {
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d', { alpha: false });
+  const hint = document.getElementById('hint'), bar = document.getElementById('bar');
+  const CELL = 4;                       // px per sand cell
+  let cols = 0, rows = 0, grid = null, img = null, off = document.createElement('canvas'), octx = null;
+
+  // warm sand + a few cool accents
+  const COLORS = [
+    [232, 205, 154], [214, 178, 118], [246, 226, 190],
+    [198, 152, 96],  [229, 160, 130], [141, 196, 208],
+    [176, 152, 216], [120, 132, 150]
+  ];
+  let current = 1;                      // index into COLORS + 1
+
+  function resize() {
+    const dpr = 1;                      // pixel grid; CSS scales it
+    cols = Math.ceil(innerWidth / CELL);
+    rows = Math.ceil(innerHeight / CELL);
+    grid = new Uint8Array(cols * rows);
+    off.width = cols; off.height = rows;
+    octx = off.getContext('2d', { alpha: false });
+    img = octx.createImageData(cols, rows);
+    for (let i = 0; i < cols * rows; i++) {
+      img.data[i*4+0] = 10; img.data[i*4+1] = 15; img.data[i*4+2] = 26; img.data[i*4+3] = 255;
+    }
+    octx.putImageData(img, 0, 0);
+    cv.width = cols; cv.height = rows;
+    cv.style.width = innerWidth + 'px'; cv.style.height = innerHeight + 'px';
+    ctx.imageSmoothingEnabled = false;
+  }
+
+  // ---- palette UI ----
+  COLORS.forEach((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'sw' + (i + 1 === current ? ' on' : '');
+    d.style.background = `rgb(${c.join(',')})`;
+    d.title = 'sand ' + (i + 1);
+    d.addEventListener('click', () => {
+      current = i + 1;
+      [...bar.querySelectorAll('.sw')].forEach((el, j) => el.classList.toggle('on', j + 1 === current));
+    });
+    bar.appendChild(d);
+  });
+  const clr = document.createElement('button');
+  clr.textContent = 'clear';
+  clr.addEventListener('click', () => { grid.fill(0); });
+  bar.appendChild(clr);
+
+  // ---- interaction ----
+  let down = false, last = null;
+  function px(e) { const p = e.touches ? e.touches[0] : e; return { x: p.clientX, y: p.clientY }; }
+
+  function pour(x, y) {
+    const cx = x / CELL, cy = y / CELL;
+    const R = 7;
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        if (dx*dx + dy*dy > R*R) continue;
+        const gx = Math.round(cx + dx), gy = Math.round(cy + dy);
+        if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
+        if (Math.random() < 0.62) grid[gy * cols + gx] = current;
+      }
+    }
+  }
+
+  cv.addEventListener('mousedown', e => { down = true; last = px(e); pour(last.x, last.y); hint.classList.add('off'); });
+  addEventListener('mousemove', e => {
+    if (!down) return;
+    const p = px(e);
+    if (last) {
+      const steps = Math.ceil(Math.hypot(p.x - last.x, p.y - last.y) / (CELL * 2)) || 1;
+      for (let i = 1; i <= steps; i++) {
+        pour(last.x + (p.x - last.x) * i / steps, last.y + (p.y - last.y) * i / steps);
+      }
+    }
+    last = p;
+  });
+  addEventListener('mouseup', () => { down = false; last = null; });
+  cv.addEventListener('touchstart', e => { e.preventDefault(); down = true; last = px(e); pour(last.x, last.y); hint.classList.add('off'); }, { passive: false });
+  addEventListener('touchmove', e => {
+    if (!down) return;
+    e.preventDefault();
+    const p = px(e);
+    if (last) {
+      const steps = Math.ceil(Math.hypot(p.x - last.x, p.y - last.y) / (CELL * 2)) || 1;
+      for (let i = 1; i <= steps; i++) pour(last.x + (p.x - last.x) * i / steps, last.y + (p.y - last.y) * i / steps);
+    }
+    last = p;
+  }, { passive: false });
+  addEventListener('touchend', () => { down = false; last = null; });
+
+  // ---- simulation: grains fall, then slide diagonally into a pile ----
+  function step() {
+    for (let y = rows - 2; y >= 0; y--) {
+      const rowOff = y * cols, nextOff = (y + 1) * cols;
+      // alternate scan direction to avoid directional bias
+      const leftFirst = (y & 1) === 0;
+      for (let k = 0; k < cols; k++) {
+        const x = leftFirst ? k : cols - 1 - k;
+        const i = rowOff + x;
+        const v = grid[i];
+        if (!v) continue;
+        const below = nextOff + x;
+        if (!grid[below]) { grid[below] = v; grid[i] = 0; continue; }
+        // slide diagonally
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        const x1 = x + dir, x2 = x - dir;
+        if (x1 >= 0 && x1 < cols && !grid[nextOff + x1]) { grid[nextOff + x1] = v; grid[i] = 0; continue; }
+        if (x2 >= 0 && x2 < cols && !grid[nextOff + x2]) { grid[nextOff + x2] = v; grid[i] = 0; }
+      }
+    }
+  }
+
+  function render() {
+    const d = img.data;
+    for (let i = 0; i < grid.length; i++) {
+      const v = grid[i];
+      const o = i * 4;
+      if (v) {
+        const c = COLORS[v - 1];
+        // slight per-grain tint variation for texture
+        const j = ((i * 2654435761) % 11) - 5;
+        d[o] = c[0] + j; d[o+1] = c[1] + j; d[o+2] = c[2] + j; d[o+3] = 255;
+      } else {
+        d[o] = 10; d[o+1] = 15; d[o+2] = 26; d[o+3] = 255;
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.drawImage(off, 0, 0, cols, rows, 0, 0, cols, rows);
+  }
+
+  let acc = 0, prev = performance.now();
+  function loop(now) {
+    const dt = Math.min(64, now - prev); prev = now;
+    acc += dt;
+    // fixed 60Hz-ish simulation, max 2 catch-up steps
+    let steps = 0;
+    while (acc >= 16 && steps < 2) { step(); acc -= 16; steps++; }
+    if (acc > 200) acc = 0;
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  resize();
+  addEventListener('resize', () => { resize(); });
+  requestAnimationFrame(loop);
+  setTimeout(() => hint.classList.add('off'), 9000);
+})();
+</script>
+</body>
+</html>

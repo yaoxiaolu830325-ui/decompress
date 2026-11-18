@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Decompress — three little toys for your hands</title>
+<meta name="description" content="Three tiny browser toys: bubble wrap, silk ribbons and pouring sand. No install, no accounts, no ads.">
+<style>
+  :root{--bg:#070b14;--ink:#e8eef9;--dim:#6d7c95;--line:rgba(255,255,255,.08)}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(circle at 50% -10%,#132038 0%,var(--bg) 55%);
+    color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:56px 20px 40px}
+  h1{margin:0 0 8px;font-size:30px;letter-spacing:.02em}
+  p.sub{margin:0 0 40px;color:var(--dim);font-size:15px;text-align:center;max-width:560px;line-height:1.6}
+  .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));width:100%;max-width:900px}
+  a.card{display:block;text-decoration:none;color:inherit;border:1px solid var(--line);border-radius:18px;
+    padding:20px;background:rgba(255,255,255,.025);transition:transform .2s,border-color .2s,background .2s}
+  a.card:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.22);background:rgba(255,255,255,.05)}
+  .thumb{height:120px;border-radius:12px;margin-bottom:14px;position:relative;overflow:hidden}
+  .thumb.bw{background:
+     radial-gradient(circle at 16px 16px, rgba(255,255,255,.35) 6px, transparent 7px) 0 0/32px 32px,
+     linear-gradient(135deg,#12203a,#0b1322)}
+  .thumb.silk{background:linear-gradient(120deg,#0b1322,#12203a 60%,#1b2a49);}
+  .thumb.silk::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(60px 60px at 30% 55%,rgba(34,211,238,.5),transparent 70%),
+               radial-gradient(70px 70px at 62% 40%,rgba(167,139,250,.45),transparent 70%),
+               radial-gradient(50px 50px at 82% 62%,rgba(244,114,182,.4),transparent 70%);filter:blur(6px)}
+  .thumb.sand{background:linear-gradient(180deg,#0b1322 55%,#e8cd9a 55% 68%,#d6b276 68% 76%,#c69860 76%)}
+  h2{margin:0 0 6px;font-size:17px}
+  .desc{color:var(--dim);font-size:13px;line-height:1.55;margin:0}
+  footer{margin-top:44px;color:#4b5871;font-size:12px;text-align:center;line-height:1.8}
+  footer a{color:#8fa3c0;text-decoration:none;border-bottom:1px dotted #33415c}
+</style>
+</head>
+<body>
+  <h1>Decompress</h1>
+  <p class="sub">Three tiny toys for your hands. No goals, no timers, no ads. Open one, poke at it for a minute, close the tab.</p>
+  <div class="grid">
+    <a class="card" href="./bubblewrap/">
+      <div class="thumb bw"></div>
+      <h2>Bubble Wrap</h2>
+      <p class="desc">Infinite bubble wrap. Drag across the sheet — every bubble dents and stays dented.</p>
+    </a>
+    <a class="card" href="./silk/">
+      <div class="thumb silk"></div>
+      <h2>Silk</h2>
+      <p class="desc">Draw ribbons of light and let go. They flow, sway and slowly fall away.</p>
+    </a>
+    <a class="card" href="./sand/">
+      <div class="thumb sand"></div>
+      <h2>Sand</h2>
+      <p class="desc">Pour colored sand with a finger. It piles up, slides and settles where you leave it.</p>
+    </a>
+  </div>
+  <footer>
+    Made by Yao Engineering · <a href="https://ko-fi.com/yaoengineering" target="_blank" rel="noopener">engineering calculation tools</a><br>
+    All three games are single HTML files, MIT licensed.
+  </footer>
+</body>
+</html>
